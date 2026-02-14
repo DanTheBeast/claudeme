@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap');
+
+@layer base {
+  body {
+    @apply bg-[#FDFBF9] text-gray-900 antialiased;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .callme-gradient {
+    @apply bg-gradient-to-br from-callme to-callme-light;
+  }
+}
+
+/* ─── Animations ─────────────────────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes pulse-status {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+@keyframes glow-green {
+  0%, 100% { box-shadow: 0 0 16px rgba(16,185,129,0.2); }
+  50% { box-shadow: 0 0 28px rgba(16,185,129,0.4); }
+}
+
+.anim-fade-up { animation: fade-up 0.5s ease both; }
+.anim-fade-up-1 { animation: fade-up 0.5s 0.08s ease both; }
+.anim-fade-up-2 { animation: fade-up 0.5s 0.16s ease both; }
+.anim-fade-up-3 { animation: fade-up 0.5s 0.24s ease both; }
+.anim-fade-up-4 { animation: fade-up 0.5s 0.32s ease both; }
+.anim-fade-in { animation: fade-in 0.3s ease both; }
+.anim-scale-in { animation: scale-in 0.25s ease both; }
+.anim-slide-up { animation: slide-up 0.3s ease both; }
+.anim-float { animation: float-y 3s ease-in-out infinite; }
+
+.status-pulse { animation: pulse-status 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.glow-green { animation: glow-green 3s ease-in-out infinite; }
