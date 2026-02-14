@@ -70,8 +70,9 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#FDFBF9] via-[#FFF5EF] to-[#FFE8D6] flex items-center justify-center p-5">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen bg-gradient-to-b from-[#FDFBF9] via-[#FFF5EF] to-[#FFE8D6] flex flex-col items-center justify-center p-5">
+      <div className="w-full max-w-sm flex-1 flex items-center justify-center">
+        <div className="w-full">
         {/* Step 0: Splash */}
         {step === 0 && (
           <div className="text-center anim-fade-up">
@@ -300,7 +301,11 @@ export default function AuthPage() {
             </button>
           </div>
         )}
+        </div>
       </div>
+      <footer className="text-center py-4 text-xs text-gray-400">
+        Copyright Dan Fields 2026. All Rights Reserved.
+      </footer>
     </div>
   );
 }
