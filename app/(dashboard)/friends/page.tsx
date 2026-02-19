@@ -13,6 +13,8 @@ import {
   X,
   Users,
   Check,
+  Share2,
+  MessageCircle,
 } from "lucide-react";
 import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
@@ -158,6 +160,29 @@ export default function FriendsPage() {
     loadData();
   };
 
+  const inviteFriends = async () => {
+    const inviteUrl = `${window.location.origin}/auth`;
+    const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Join me so we can actually talk — no algorithms, no ads.\n\n${inviteUrl}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Join me on CallMe",
+          text: inviteText,
+        });
+      } catch (err: unknown) {
+        // User cancelled the share sheet — not an error
+        if (err instanceof Error && err.name !== "AbortError") {
+          toast("Couldn't share — try copying the link instead");
+        }
+      }
+    } else {
+      // Fallback: open SMS compose with pre-filled message
+      const smsBody = encodeURIComponent(inviteText);
+      window.open(`sms:?&body=${smsBody}`, "_self");
+    }
+  };
+
   const available = friends.filter((f) => f.friend.is_available);
   const offline = friends.filter((f) => !f.friend.is_available);
 
@@ -165,12 +190,20 @@ export default function FriendsPage() {
     <div className="pb-24">
       <header className="bg-white border-b border-gray-100/80 sticky top-0 z-30 px-5 py-3.5 flex items-center justify-between">
         <h1 className="font-display text-xl font-bold">Friends</h1>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
-        >
-          <Plus className="w-4 h-4" /> Add
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={inviteFriends}
+            className="text-callme border border-callme/20 px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:bg-callme-50 transition-all"
+          >
+            <Share2 className="w-4 h-4" /> Invite
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
       </header>
 
       <main className="px-5 pt-5 flex flex-col gap-5">
@@ -274,12 +307,20 @@ export default function FriendsPage() {
               Add the friends and family you actually want to talk to
               — not the whole internet.
             </p>
-            <button
-              onClick={() => setShowAdd(true)}
-              className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
-            >
-              <Search className="w-4 h-4" /> Find Friends
-            </button>
+            <div className="flex flex-col gap-2.5 items-center">
+              <button
+                onClick={() => setShowAdd(true)}
+                className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
+              >
+                <Search className="w-4 h-4" /> Find Friends
+              </button>
+              <button
+                onClick={inviteFriends}
+                className="text-callme px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 border border-callme/20 hover:bg-callme-50 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" /> Invite Friends
+              </button>
+            </div>
           </div>
         )}
       </main>
@@ -347,6 +388,25 @@ export default function FriendsPage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Invite Friends section */}
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <button
+            onClick={inviteFriends}
+            className="w-full flex items-center gap-3 p-4 bg-gradient-to-r from-callme-50 to-orange-50 rounded-[16px] border border-callme/10 hover:border-callme/25 transition-all group"
+          >
+            <div className="w-10 h-10 rounded-full callme-gradient flex items-center justify-center flex-shrink-0 group-hover:shadow-md group-hover:shadow-callme/25 transition-all">
+              <MessageCircle className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-sm">Invite Friends</p>
+              <p className="text-xs text-gray-500">
+                Text a link to people in your contacts
+              </p>
+            </div>
+            <Share2 className="w-4 h-4 text-gray-400 ml-auto" />
+          </button>
         </div>
       </BottomSheet>
     </div>

@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
-import { Calendar, Clock, Plus, X } from "lucide-react";
-import type { AvailabilityWindow } from "@/app/_lib/types";
+import { Avatar } from "@/app/_components/avatar";
+import { Calendar, Clock, Plus, X, Users, Phone } from "lucide-react";
+import type { AvailabilityWindow, Profile } from "@/app/_lib/types";
 
 const DAYS = [
   "Sunday",
@@ -23,12 +24,37 @@ function formatTime12(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function timesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string
+): boolean {
+  const a0 = timeToMinutes(aStart);
+  const a1 = timeToMinutes(aEnd);
+  const b0 = timeToMinutes(bStart);
+  const b1 = timeToMinutes(bEnd);
+  return a0 < b1 && b0 < a1;
+}
+
+interface FriendWindow extends AvailabilityWindow {
+  friend?: Profile;
+}
+
 export default function SchedulePage() {
   const { user, toast } = useApp();
   const supabase = createClient();
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
+  const [friendWindows, setFriendWindows] = useState<FriendWindow[]>([]);
+  const [friendProfiles, setFriendProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showFriends, setShowFriends] = useState(true);
   const [addModal, setAddModal] = useState<{
     day: number;
     start: string;
@@ -38,6 +64,8 @@ export default function SchedulePage() {
 
   const loadWindows = async () => {
     if (!user) return;
+
+    // Load user's own windows
     const { data } = await supabase
       .from("availability_windows")
       .select("*")
@@ -46,6 +74,51 @@ export default function SchedulePage() {
       .order("start_time");
 
     setWindows((data || []) as AvailabilityWindow[]);
+
+    // Load friends
+    const { data: sent } = await supabase
+      .from("friendships")
+      .select("friend_id")
+      .eq("user_id", user.id)
+      .eq("status", "accepted");
+
+    const { data: received } = await supabase
+      .from("friendships")
+      .select("user_id")
+      .eq("friend_id", user.id)
+      .eq("status", "accepted");
+
+    const friendIds = [
+      ...(sent || []).map((f) => f.friend_id),
+      ...(received || []).map((f) => f.user_id),
+    ];
+
+    if (friendIds.length > 0) {
+      // Load friend profiles
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", friendIds);
+      setFriendProfiles((profiles || []) as Profile[]);
+
+      // Load friends' availability windows
+      const { data: fWindows } = await supabase
+        .from("availability_windows")
+        .select("*")
+        .in("user_id", friendIds)
+        .order("start_time");
+
+      const profileMap = new Map(
+        (profiles || []).map((p: Profile) => [p.id, p])
+      );
+      setFriendWindows(
+        (fWindows || []).map((w: AvailabilityWindow) => ({
+          ...w,
+          friend: profileMap.get(w.user_id) as Profile | undefined,
+        }))
+      );
+    }
+
     setLoading(false);
   };
 
@@ -70,7 +143,7 @@ export default function SchedulePage() {
     if (error) {
       toast("Failed to add window");
     } else {
-      toast("Availability added ✅");
+      toast("Availability added");
       setAddModal(null);
       loadWindows();
     }
@@ -84,11 +157,30 @@ export default function SchedulePage() {
 
   const today = new Date().getDay();
 
-  // Group by day
+  // Group user's windows by day
   const grouped: Record<number, AvailabilityWindow[]> = {};
   windows.forEach((w) => {
     (grouped[w.day_of_week] = grouped[w.day_of_week] || []).push(w);
   });
+
+  // Group friends' windows by day
+  const friendGrouped: Record<number, FriendWindow[]> = {};
+  friendWindows.forEach((w) => {
+    (friendGrouped[w.day_of_week] = friendGrouped[w.day_of_week] || []).push(w);
+  });
+
+  // Find overlaps for a given day: friend windows that overlap with any of user's windows
+  const getOverlappingFriends = (dayIdx: number): FriendWindow[] => {
+    const myWindows = grouped[dayIdx] || [];
+    const theirWindows = friendGrouped[dayIdx] || [];
+    if (myWindows.length === 0) return [];
+
+    return theirWindows.filter((fw) =>
+      myWindows.some((mw) =>
+        timesOverlap(mw.start_time, mw.end_time, fw.start_time, fw.end_time)
+      )
+    );
+  };
 
   return (
     <div className="pb-24">
@@ -97,19 +189,32 @@ export default function SchedulePage() {
           <Calendar className="w-[18px] h-[18px] text-callme" />
           <h1 className="font-display text-xl font-bold">Schedule</h1>
         </div>
-        <button
-          onClick={() =>
-            setAddModal({
-              day: today,
-              start: "09:00",
-              end: "10:00",
-              desc: "",
-            })
-          }
-          className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
-        >
-          <Plus className="w-4 h-4" /> Add
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFriends(!showFriends)}
+            className={`px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 transition-all ${
+              showFriends
+                ? "bg-blue-50 text-blue-600 border border-blue-200"
+                : "bg-gray-50 text-gray-400 border border-gray-200"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Friends
+          </button>
+          <button
+            onClick={() =>
+              setAddModal({
+                day: today,
+                start: "09:00",
+                end: "10:00",
+                desc: "",
+              })
+            }
+            className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
+          >
+            <Plus className="w-4 h-4" /> Add
+          </button>
+        </div>
       </header>
 
       <main className="px-5 pt-5 flex flex-col gap-3">
@@ -137,7 +242,14 @@ export default function SchedulePage() {
         ) : (
           DAYS.map((dayName, dayIdx) => {
             const dayWindows = grouped[dayIdx] || [];
+            const dayFriendWindows = friendGrouped[dayIdx] || [];
+            const overlapping = getOverlappingFriends(dayIdx);
             const isToday = dayIdx === today;
+
+            // Deduplicate overlapping friends for the match badge
+            const overlappingFriendIds = Array.from(
+              new Set(overlapping.map((fw) => fw.user_id))
+            );
 
             return (
               <div
@@ -162,6 +274,12 @@ export default function SchedulePage() {
                         Today
                       </span>
                     )}
+                    {showFriends && overlappingFriendIds.length > 0 && (
+                      <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full">
+                        {overlappingFriendIds.length} match
+                        {overlappingFriendIds.length > 1 ? "es" : ""}
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={() =>
@@ -178,6 +296,7 @@ export default function SchedulePage() {
                   </button>
                 </div>
 
+                {/* User's own windows */}
                 {dayWindows.length === 0 ? (
                   <p className="text-xs text-gray-300">No availability</p>
                 ) : (
@@ -208,6 +327,85 @@ export default function SchedulePage() {
                     ))}
                   </div>
                 )}
+
+                {/* Friends' windows for this day */}
+                {showFriends && dayFriendWindows.length > 0 && (
+                  <div className="mt-2.5 pt-2.5 border-t border-gray-100">
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+                      Friends available
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {dayFriendWindows.map((fw) => {
+                        const isOverlap =
+                          dayWindows.length > 0 &&
+                          dayWindows.some((mw) =>
+                            timesOverlap(
+                              mw.start_time,
+                              mw.end_time,
+                              fw.start_time,
+                              fw.end_time
+                            )
+                          );
+
+                        return (
+                          <div
+                            key={fw.id}
+                            className={`flex items-center justify-between px-3 py-2 rounded-[12px] ${
+                              isOverlap
+                                ? "bg-blue-50 border border-blue-200"
+                                : "bg-gray-50 border border-gray-100"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <Avatar
+                                name={fw.friend?.display_name || "Friend"}
+                                id={fw.user_id}
+                                size="sm"
+                              />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={`text-[12px] font-semibold truncate ${
+                                      isOverlap
+                                        ? "text-blue-800"
+                                        : "text-gray-600"
+                                    }`}
+                                  >
+                                    {fw.friend?.display_name || "Friend"}
+                                  </span>
+                                  {isOverlap && (
+                                    <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                                      MATCH
+                                    </span>
+                                  )}
+                                </div>
+                                <span
+                                  className={`text-[11px] ${
+                                    isOverlap
+                                      ? "text-blue-600"
+                                      : "text-gray-400"
+                                  }`}
+                                >
+                                  {formatTime12(fw.start_time)} –{" "}
+                                  {formatTime12(fw.end_time)}
+                                  {fw.description && ` · ${fw.description}`}
+                                </span>
+                              </div>
+                            </div>
+                            {isOverlap && fw.friend?.phone_number && (
+                              <a
+                                href={`tel:${fw.friend.phone_number}`}
+                                className="callme-gradient text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 hover:shadow-md hover:shadow-callme/25 transition-all"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
@@ -215,10 +413,7 @@ export default function SchedulePage() {
       </main>
 
       {/* Add Window — Bottom Sheet */}
-      <BottomSheet
-        open={!!addModal}
-        onClose={() => setAddModal(null)}
-      >
+      <BottomSheet open={!!addModal} onClose={() => setAddModal(null)}>
         <h3 className="font-display text-xl font-bold mb-5 flex items-center gap-2">
           <Clock className="w-5 h-5" /> Add Availability
         </h3>
@@ -288,8 +483,7 @@ export default function SchedulePage() {
             <div className="bg-gray-50 p-3.5 rounded-[14px]">
               <p className="text-sm text-gray-600">
                 <strong>Preview:</strong> {DAYS[addModal.day]},{" "}
-                {formatTime12(addModal.start)} –{" "}
-                {formatTime12(addModal.end)}
+                {formatTime12(addModal.start)} – {formatTime12(addModal.end)}
                 {addModal.desc && ` · ${addModal.desc}`}
               </p>
             </div>
