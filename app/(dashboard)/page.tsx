@@ -128,8 +128,11 @@ export default function HomePage() {
 
   return (
     <div className="pb-24">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100/80 sticky z-30 px-5 py-3.5 flex items-center justify-between" style={{ top: 0 }}>
+      {/* Header — fixed so it never scrolls away, offset by safe-area */}
+      <header
+        className="bg-white/95 backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 px-5 py-3.5 flex items-center justify-between max-w-md mx-auto"
+        style={{ top: "env(safe-area-inset-top, 0px)" }}
+      >
         <div className="flex items-center gap-2.5">
           <img src="/logo.png" alt="CallMe" className="w-8 h-8 rounded-[10px]" />
           <span className="font-display text-xl font-bold">CallMe</span>
@@ -138,6 +141,9 @@ export default function HomePage() {
           Hey {user.display_name?.split(" ")[0]}! 👋
         </span>
       </header>
+
+      {/* Spacer to push content below the fixed header + safe area */}
+      <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 56px)" }} />
 
       <main className="px-5 pt-5 flex flex-col gap-5">
         {/* ── Compact availability strip (not a giant circle) ── */}

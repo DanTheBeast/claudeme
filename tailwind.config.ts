@@ -7,14 +7,14 @@ module.exports = {
     extend: {
       colors: {
         callme: {
-          DEFAULT: "#E8845A",
-          light: "#F09B77",
-          dark: "#D4693E",
-          50: "#FDF6F2",
-          100: "#FAEAE0",
-          200: "#F3CDB8",
-          500: "#E8845A",
-          600: "#D4693E",
+          DEFAULT: "#D46B50",
+          light: "#DE7F65",
+          dark: "#C05840",
+          50: "#FBF4F1",
+          100: "#F5E4DC",
+          200: "#EBC5B5",
+          500: "#D46B50",
+          600: "#C05840",
         },
       },
       fontFamily: {
