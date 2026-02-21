@@ -40,7 +40,11 @@ export default function DashboardLayout({
     const {
       data: { user: authUser },
     } = await supabase.auth.getUser();
-    if (!authUser) return;
+    if (!authUser) {
+      // No authenticated user — redirect to auth page
+      window.location.href = "/auth";
+      return;
+    }
 
     const { data } = await supabase
       .from("profiles")

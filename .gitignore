@@ -1,6 +1,12 @@
 node_modules/
 .next/
+out/
 .env.local
 .env*.local
 *.tsbuildinfo
 next-env.d.ts
+.DS_Store
+
+# Capacitor native projects (generated, can be recreated with `npx cap add`)
+ios/
+android/
