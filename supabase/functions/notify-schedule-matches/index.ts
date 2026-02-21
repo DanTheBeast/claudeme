@@ -35,7 +35,7 @@ async function getApnsJwt(): Promise<string> {
   const pemBody = APNS_KEY_P8
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/\s/g, "");
+    .replace(/[\s|]/g, "");  // strip whitespace and pipe chars from tr newline workaround
 
   const keyData = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
   const cryptoKey = await crypto.subtle.importKey(
