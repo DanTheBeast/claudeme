@@ -42,6 +42,7 @@ export default function DashboardLayout({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const launchJinglePlayed = useRef(false);
+  const initialLoadDone = useRef(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -52,6 +53,7 @@ export default function DashboardLayout({
       if (!session?.user) {
         setAuthed(false);
         setLoading(false);
+        initialLoadDone.current = true;
         return;
       }
 
@@ -63,7 +65,6 @@ export default function DashboardLayout({
 
       if (data) setUser(data as Profile);
       setAuthed(true);
-      // Play launch jingle only once on first load
       if (!launchJinglePlayed.current) {
         launchJinglePlayed.current = true;
         setTimeout(() => soundAppLaunch(), 400);
@@ -72,25 +73,33 @@ export default function DashboardLayout({
       setAuthed(false);
     }
     setLoading(false);
-    // Hide splash screen as soon as app is ready
+    initialLoadDone.current = true;
     try { await SplashScreen.hide(); } catch {}
   }, [supabase]);
 
   useEffect(() => {
+    // Safety net: never stay stuck on loading screen beyond 5s
+    const timeout = setTimeout(() => {
+      if (!initialLoadDone.current) {
+        setLoading(false);
+        initialLoadDone.current = true;
+        try { SplashScreen.hide(); } catch {}
+      }
+    }, 5000);
+
     fetchProfile();
 
-    // Re-check session when app comes back to foreground
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        fetchProfile();
-      }
+      if (document.visibilityState === "visible") fetchProfile();
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Skip the initial INITIAL_SESSION event — fetchProfile already handles it
+      if (!initialLoadDone.current) return;
+
       if (session?.user) {
-        // Show loading spinner immediately so AuthPage doesn't flash
-        setLoading(true);
         const { data } = await supabase
           .from("profiles")
           .select("*")
@@ -98,11 +107,9 @@ export default function DashboardLayout({
           .single();
         if (data) setUser(data as Profile);
         setAuthed(true);
-        setLoading(false);
       } else {
         setUser(null);
         setAuthed(false);
-        setLoading(false);
       }
     });
 
@@ -120,6 +127,7 @@ export default function DashboardLayout({
       .subscribe();
 
     return () => {
+      clearTimeout(timeout);
       document.removeEventListener("visibilitychange", handleVisibility);
       subscription.unsubscribe();
       supabase.removeChannel(channel);
