@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackError } from "@/app/_lib/haptics";
+import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackError, soundsEnabled, setSoundsEnabled } from "@/app/_lib/haptics";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
 import { Avatar } from "@/app/_components/avatar";
@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Camera,
   Bug,
+  Volume2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -28,6 +29,7 @@ export default function ProfilePage() {
 
   const [editing, setEditing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [appSounds, setAppSounds] = useState(() => soundsEnabled());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState({
     display_name: user?.display_name || "",
@@ -328,11 +330,7 @@ export default function ProfilePage() {
             return (
               <div
                 key={s.key}
-                className={`flex items-center justify-between py-3.5 ${
-                  i < settings.length - 1
-                    ? "border-b border-gray-50"
-                    : ""
-                }`}
+                className="flex items-center justify-between py-3.5 border-b border-gray-50"
               >
                 <div>
                   <p className="text-sm font-medium">{s.title}</p>
@@ -353,6 +351,33 @@ export default function ProfilePage() {
               </div>
             );
           })}
+          {/* Local-only sounds toggle */}
+          <div className="flex items-center justify-between py-3.5">
+            <div className="flex items-start gap-2.5">
+              <Volume2 className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium">App Sounds</p>
+                <p className="text-xs text-gray-400 mt-0.5">UI sound effects</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const next = !appSounds;
+                setSoundsEnabled(next);
+                setAppSounds(next);
+                if (next) feedbackToggleOn(); else feedbackToggleOff();
+              }}
+              className={`w-11 h-6 rounded-full relative transition-colors flex-shrink-0 ${
+                appSounds ? "bg-callme" : "bg-gray-300"
+              }`}
+            >
+              <div
+                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${
+                  appSounds ? "left-[22px]" : "left-0.5"
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Report a Bug */}

@@ -18,6 +18,21 @@ export async function hapticError() {
   try { await Haptics.notification({ type: NotificationType.Error }); } catch {}
 }
 
+// ── Sound preference (persisted in localStorage) ─────────────
+
+const SOUNDS_KEY = "callme_sounds_enabled";
+
+export function soundsEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  const val = localStorage.getItem(SOUNDS_KEY);
+  return val === null ? true : val === "true";
+}
+
+export function setSoundsEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SOUNDS_KEY, String(enabled));
+}
+
 // ── Web Audio sound effects ──────────────────────────────────
 
 let ctx: AudioContext | null = null;
@@ -34,6 +49,7 @@ function playTone(
   type: OscillatorType = "sine",
   gainPeak = 0.18
 ) {
+  if (!soundsEnabled()) return;
   const ac = getCtx();
   if (!ac) return;
   const osc = ac.createOscillator();
@@ -79,6 +95,7 @@ export function soundToggleOff() {
 
 // Whoosh for bottom sheet open
 export function soundSheetOpen() {
+  if (!soundsEnabled()) return;
   const ac = getCtx();
   if (!ac) return;
   const osc = ac.createOscillator();
@@ -103,6 +120,7 @@ export function soundFriendAdded() {
 
 // App launch mnemonic — warm 4-note rising chime
 export function soundAppLaunch() {
+  if (!soundsEnabled()) return;
   const ac = getCtx();
   if (!ac) return;
 
