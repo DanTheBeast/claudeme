@@ -31,7 +31,8 @@ const DURATIONS = [
 function formatCountdown(until: string): string {
   const ms = new Date(until).getTime() - Date.now();
   if (ms <= 0) return "Expiring…";
-  const totalMins = Math.ceil(ms / 60000);
+  const totalMins = Math.floor(ms / 60000);
+  if (totalMins === 0) return "< 1 min left";
   if (totalMins >= 60) {
     const h = Math.floor(totalMins / 60);
     const m = totalMins % 60;
@@ -154,7 +155,7 @@ export default function HomePage() {
         }
       };
       tick();
-      countdownRef.current = setInterval(tick, 30000); // update every 30s
+      countdownRef.current = setInterval(tick, 60000); // update every 60s (once per minute)
     } else {
       setCountdown(null);
     }
