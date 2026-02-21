@@ -206,23 +206,29 @@ export default function FriendsPage() {
 
   return (
     <div className="pb-24">
-      <header className="bg-white border-b border-gray-100/80 sticky z-30 px-5 py-3.5 flex items-center justify-between" style={{ top: 0 }}>
-        <h1 className="font-display text-xl font-bold">Friends</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={inviteFriends}
-            className="text-callme border border-callme/20 px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:bg-callme-50 transition-all"
-          >
-            <Share2 className="w-4 h-4" /> Invite
-          </button>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
-          >
-            <Plus className="w-4 h-4" /> Add
-          </button>
+      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto" style={{ top: 0 }}>
+        <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
+        <div className="px-5 py-3.5 flex items-center justify-between">
+          <h1 className="font-display text-xl font-bold">Friends</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={inviteFriends}
+              className="text-callme border border-callme/20 px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:bg-callme-50 transition-all"
+            >
+              <Share2 className="w-4 h-4" /> Invite
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Spacer matching header height: safe-area + 56px */}
+      <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 56px)" }} />
 
       <main className="px-5 pt-5 flex flex-col gap-5">
         {/* Pending requests */}

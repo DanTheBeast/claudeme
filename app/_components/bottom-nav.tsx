@@ -16,7 +16,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100/80 z-40">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100/80 z-40" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="max-w-md mx-auto flex items-center justify-around py-1.5 pb-2">
         {items.map(({ href, icon: Icon, label }) => {
           const active = pathname === href;

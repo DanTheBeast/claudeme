@@ -188,38 +188,43 @@ export default function SchedulePage() {
 
   return (
     <div className="pb-24">
-      <header className="bg-white border-b border-gray-100/80 sticky z-30 px-5 py-3.5 flex items-center justify-between" style={{ top: 0 }}>
-        <div className="flex items-center gap-2">
-          <Calendar className="w-[18px] h-[18px] text-callme" />
-          <h1 className="font-display text-xl font-bold">Schedule</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowFriends(!showFriends)}
-            className={`px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 transition-all ${
-              showFriends
-                ? "bg-blue-50 text-blue-600 border border-blue-200"
-                : "bg-gray-50 text-gray-400 border border-gray-200"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Friends
-          </button>
-          <button
-            onClick={() =>
-              setAddModal({
-                day: today,
-                start: "09:00",
-                end: "10:00",
-                desc: "",
-              })
-            }
-            className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
-          >
-            <Plus className="w-4 h-4" /> Add
-          </button>
+      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto" style={{ top: 0 }}>
+        <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
+        <div className="px-5 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-[18px] h-[18px] text-callme" />
+            <h1 className="font-display text-xl font-bold">Schedule</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFriends(!showFriends)}
+              className={`px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 transition-all ${
+                showFriends
+                  ? "bg-blue-50 text-blue-600 border border-blue-200"
+                  : "bg-gray-50 text-gray-400 border border-gray-200"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Friends
+            </button>
+            <button
+              onClick={() =>
+                setAddModal({
+                  day: today,
+                  start: "09:00",
+                  end: "10:00",
+                  desc: "",
+                })
+              }
+              className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          </div>
         </div>
       </header>
+
+      <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 56px)" }} />
 
       <main className="px-5 pt-5 flex flex-col gap-3">
         {/* Current time */}

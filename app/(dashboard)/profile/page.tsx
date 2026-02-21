@@ -147,40 +147,45 @@ export default function ProfilePage() {
 
   return (
     <div className="pb-24">
-      <header className="bg-white border-b border-gray-100/80 sticky top-0 z-30 px-5 py-3.5 flex items-center justify-between">
-        <h1 className="font-display text-xl font-bold">Profile</h1>
-        {!editing ? (
-          <button
-            onClick={() => setEditing(true)}
-            className="text-callme text-[13px] font-medium flex items-center gap-1 border border-callme-200 px-3.5 py-1.5 rounded-[12px] hover:bg-callme-50 transition-colors"
-          >
-            <Edit3 className="w-3.5 h-3.5" /> Edit
-          </button>
-        ) : (
-          <div className="flex gap-2">
+      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto" style={{ top: 0 }}>
+        <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
+        <div className="px-5 py-3.5 flex items-center justify-between">
+          <h1 className="font-display text-xl font-bold">Profile</h1>
+          {!editing ? (
             <button
-              onClick={() => {
-                setEditing(false);
-                setDraft({
-                  display_name: user.display_name,
-                  phone_number: user.phone_number || "",
-                  current_mood: user.current_mood || "",
-                  username: user.username || "",
-                });
-              }}
-              className="text-[13px] border border-gray-200 px-3 py-1.5 rounded-[12px] text-gray-500"
+              onClick={() => setEditing(true)}
+              className="text-callme text-[13px] font-medium flex items-center gap-1 border border-callme-200 px-3.5 py-1.5 rounded-[12px] hover:bg-callme-50 transition-colors"
             >
-              Cancel
+              <Edit3 className="w-3.5 h-3.5" /> Edit
             </button>
-            <button
-              onClick={save}
-              className="callme-gradient text-white text-[13px] px-3.5 py-1.5 rounded-[12px] font-semibold flex items-center gap-1"
-            >
-              <Save className="w-3.5 h-3.5" /> Save
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setDraft({
+                    display_name: user.display_name,
+                    phone_number: user.phone_number || "",
+                    current_mood: user.current_mood || "",
+                    username: user.username || "",
+                  });
+                }}
+                className="text-[13px] border border-gray-200 px-3 py-1.5 rounded-[12px] text-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                className="callme-gradient text-white text-[13px] px-3.5 py-1.5 rounded-[12px] font-semibold flex items-center gap-1"
+              >
+                <Save className="w-3.5 h-3.5" /> Save
+              </button>
+            </div>
+          )}
+        </div>
       </header>
+
+      <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 56px)" }} />
 
       <main className="px-5 pt-5 flex flex-col gap-5">
         {/* Profile card */}
