@@ -22,6 +22,7 @@ export interface Profile {
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
   enable_quiet_hours: boolean;
+  available_until: string | null;
   [key: string]: string | boolean | null;
 }
 

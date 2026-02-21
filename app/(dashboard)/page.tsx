@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "./layout";
 import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick } from "@/app/_lib/haptics";
 import { FriendCard } from "@/app/_components/friend-card";
+import { BottomSheet } from "@/app/_components/bottom-sheet";
 import {
   Phone,
   PhoneOff,
@@ -13,9 +14,31 @@ import {
   Save,
   Clock,
   ChevronDown,
+  Timer,
+  Infinity,
 } from "lucide-react";
 import Link from "next/link";
 import type { FriendWithProfile, Profile } from "@/app/_lib/types";
+
+const DURATIONS = [
+  { label: "15 min",  minutes: 15 },
+  { label: "30 min",  minutes: 30 },
+  { label: "1 hour",  minutes: 60 },
+  { label: "2 hours", minutes: 120 },
+  { label: "Until I turn it off", minutes: null },
+];
+
+function formatCountdown(until: string): string {
+  const ms = new Date(until).getTime() - Date.now();
+  if (ms <= 0) return "Expiring…";
+  const totalMins = Math.ceil(ms / 60000);
+  if (totalMins >= 60) {
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return m > 0 ? `${h}h ${m}m left` : `${h}h left`;
+  }
+  return `${totalMins} min left`;
+}
 
 export default function HomePage() {
   const { user, refreshUser, toast } = useApp();
@@ -26,6 +49,9 @@ export default function HomePage() {
   const [moodDirty, setMoodDirty] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(true);
   const [offlineOpen, setOfflineOpen] = useState(false);
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
+  const [countdown, setCountdown] = useState<string | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -94,20 +120,67 @@ export default function HomePage() {
     };
   }, [user]);
 
-  const toggleAvailability = async () => {
+  // Countdown ticker — starts/clears based on available_until
+  useEffect(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+
+    if (user?.is_available && user.available_until) {
+      const tick = () => {
+        const ms = new Date(user.available_until!).getTime() - Date.now();
+        if (ms <= 0) {
+          // Expired — turn off automatically
+          setCountdown(null);
+          clearInterval(countdownRef.current!);
+          supabase
+            .from("profiles")
+            .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
+            .eq("id", user.id)
+            .then(() => refreshUser());
+        } else {
+          setCountdown(formatCountdown(user.available_until!));
+        }
+      };
+      tick();
+      countdownRef.current = setInterval(tick, 30000); // update every 30s
+    } else {
+      setCountdown(null);
+    }
+
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, [user?.is_available, user?.available_until]);
+
+  const goAvailable = async (minutes: number | null) => {
     if (!user) return;
-    const newVal = !user.is_available;
-    if (newVal) feedbackToggleOn(); else feedbackToggleOff();
+    feedbackToggleOn();
+    const available_until = minutes
+      ? new Date(Date.now() + minutes * 60 * 1000).toISOString()
+      : null;
     await supabase
       .from("profiles")
-      .update({ is_available: newVal, last_seen: new Date().toISOString() })
+      .update({ is_available: true, available_until, last_seen: new Date().toISOString() })
       .eq("id", user.id);
     await refreshUser();
-    toast(
-      newVal
-        ? "You're available! Friends will be notified 📞"
-        : "You're now unavailable"
-    );
+    setShowDurationPicker(false);
+    toast(minutes ? `You're available for ${DURATIONS.find(d => d.minutes === minutes)?.label}! 📞` : "You're available! 📞");
+  };
+
+  const goUnavailable = async () => {
+    if (!user) return;
+    feedbackToggleOff();
+    await supabase
+      .from("profiles")
+      .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
+      .eq("id", user.id);
+    await refreshUser();
+    toast("You're now unavailable");
+  };
+
+  const handleAvailabilityTap = () => {
+    if (user?.is_available) {
+      goUnavailable();
+    } else {
+      setShowDurationPicker(true);
+    }
   };
 
   const saveMood = async () => {
@@ -161,7 +234,7 @@ export default function HomePage() {
         >
           <div className="flex items-center gap-3">
             <button
-              onClick={toggleAvailability}
+              onClick={handleAvailabilityTap}
               className={`w-14 h-14 rounded-full border-none cursor-pointer flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
                 user.is_available
                   ? "bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/25 glow-green"
@@ -176,22 +249,24 @@ export default function HomePage() {
             </button>
             <div>
               <p className="font-semibold text-[15px]">
-                {user.is_available
-                  ? "You're available"
-                  : "You're unavailable"}
+                {user.is_available ? "You're available" : "You're unavailable"}
               </p>
-              <p className="text-[12px] text-gray-400 mt-0.5">
-                {user.is_available
-                  ? `${available.length} friend${available.length !== 1 ? "s" : ""} can see you're free`
-                  : "Tap the circle to go live"}
+              <p className="text-[12px] text-gray-400 mt-0.5 flex items-center gap-1">
+                {user.is_available ? (
+                  countdown ? (
+                    <><Timer className="w-3 h-3 text-emerald-500" />{countdown}</>
+                  ) : (
+                    `${available.length} friend${available.length !== 1 ? "s" : ""} can see you're free`
+                  )
+                ) : (
+                  "Tap to go available"
+                )}
               </p>
             </div>
           </div>
           <div
             className={`w-3 h-3 rounded-full ${
-              user.is_available
-                ? "bg-emerald-500 status-pulse"
-                : "bg-gray-300"
+              user.is_available ? "bg-emerald-500 status-pulse" : "bg-gray-300"
             }`}
           />
         </div>
@@ -339,6 +414,37 @@ export default function HomePage() {
             </div>
           )}
       </main>
+
+      {/* Duration Picker */}
+      <BottomSheet open={showDurationPicker} onClose={() => setShowDurationPicker(false)}>
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center">
+            <Phone className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-display font-bold text-lg">How long are you free?</p>
+            <p className="text-xs text-gray-400">Auto-turns off when time is up</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {DURATIONS.map((d) => (
+            <button
+              key={d.label}
+              onClick={() => goAvailable(d.minutes)}
+              className="w-full flex items-center justify-between px-5 py-3.5 bg-white border border-gray-200 rounded-[16px] hover:border-emerald-300 hover:bg-emerald-50 transition-all group"
+            >
+              <span className="font-semibold text-sm group-hover:text-emerald-700 transition-colors">
+                {d.label}
+              </span>
+              {d.minutes === null ? (
+                <Infinity className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors" />
+              ) : (
+                <Timer className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors" />
+              )}
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
     </div>
   );
 }
