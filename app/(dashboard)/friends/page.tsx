@@ -109,7 +109,7 @@ export default function FriendsPage() {
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [user?.id]);
 
   // Debounced search
   useEffect(() => {

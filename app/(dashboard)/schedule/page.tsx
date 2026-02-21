@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
 import { feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
@@ -62,6 +62,7 @@ export default function SchedulePage() {
   const [friendWindows, setFriendWindows] = useState<FriendWindow[]>([]);
   const [friendProfiles, setFriendProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadedOnce = useRef(false);
   const [showFriends, setShowFriends] = useState(true);
   const [addModal, setAddModal] = useState<{
     day: number;
@@ -128,12 +129,13 @@ export default function SchedulePage() {
       );
     }
 
+    loadedOnce.current = true;
     setLoading(false);
   };
 
   useEffect(() => {
     loadWindows();
-  }, [user]);
+  }, [user?.id]);
 
   const addWindow = async (w: {
     day: number;

@@ -49,6 +49,7 @@ export default function HomePage() {
   const [mood, setMood] = useState(user?.current_mood || "");
   const [moodDirty, setMoodDirty] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(true);
+  const friendsLoadedOnce = useRef(false);
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export default function HomePage() {
 
       if (friendIds.length === 0) {
         setFriends([]);
+        friendsLoadedOnce.current = true;
         setLoadingFriends(false);
         return;
       }
@@ -110,6 +112,7 @@ export default function HomePage() {
       });
 
       setFriends(result);
+      friendsLoadedOnce.current = true;
       setLoadingFriends(false);
     }
 
@@ -127,7 +130,7 @@ export default function HomePage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
   // Countdown ticker — starts/clears based on effective availableUntil
   useEffect(() => {
@@ -350,7 +353,7 @@ export default function HomePage() {
         </div>
 
         {/* ── Loading skeleton ── */}
-        {loadingFriends && (
+        {loadingFriends && !friendsLoadedOnce.current && (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div
