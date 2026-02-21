@@ -30,10 +30,18 @@ export interface Friendship {
   user_id: string;
   friend_id: string;
   status: "pending" | "accepted" | "declined";
+  is_muted: boolean;
   created_at: string;
   // Joined data
   friend?: Profile;
   requester?: Profile;
+}
+
+export interface FriendWithProfile {
+  id: number;
+  status: string;
+  is_muted: boolean;
+  friend: Profile;
 }
 
 export interface AvailabilityWindow {
@@ -45,8 +53,4 @@ export interface AvailabilityWindow {
   description: string | null;
 }
 
-export interface FriendWithProfile {
-  id: number;
-  status: string;
-  friend: Profile;
-}
+

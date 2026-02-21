@@ -69,6 +69,7 @@ export default function HomePage() {
         return {
           id: friendship?.id || 0,
           status: "accepted",
+          is_muted: false,
           friend: p as Profile,
         };
       });
@@ -130,7 +131,7 @@ export default function HomePage() {
     <div className="pb-24">
       {/* Header — fixed, with explicit safe-area top padding */}
       <header
-        className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto relative overflow-visible"
+        className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col overflow-visible"
         style={{ top: 0 }}
       >
         {/* Safe area spacer */}

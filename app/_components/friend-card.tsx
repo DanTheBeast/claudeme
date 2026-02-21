@@ -1,9 +1,9 @@
 "use client";
 
 import { Avatar } from "./avatar";
-import { Phone, MessageCircle } from "lucide-react";
+import { Phone, MessageCircle, BellOff } from "lucide-react";
 import type { Profile } from "@/app/_lib/types";
-import { hapticMedium } from "@/app/_lib/haptics";
+import { hapticMedium, hapticLight } from "@/app/_lib/haptics";
 
 function relativeTime(d: string | Date): string {
   const ms = Date.now() - new Date(d).getTime();
@@ -17,52 +17,71 @@ function relativeTime(d: string | Date): string {
 export function FriendCard({
   friend,
   showCallLabel = false,
+  isMuted = false,
+  onPress,
 }: {
   friend: Profile;
   showCallLabel?: boolean;
+  isMuted?: boolean;
+  onPress?: () => void;
 }) {
   const phoneClean = friend.phone_number?.replace(/[^\d+]/g, "");
 
   return (
     <div
       className={`flex items-center gap-3 p-3 rounded-[18px] border transition-all hover:-translate-y-[1px] hover:shadow-sm ${
-        friend.is_available
+        isMuted
+          ? "border-gray-100 bg-gray-50/60 opacity-70"
+          : friend.is_available
           ? "border-emerald-200 bg-emerald-50/40"
           : "border-gray-100 bg-white"
       }`}
     >
-      <Avatar
-        name={friend.display_name}
-        id={friend.id}
-        src={friend.profile_picture}
-        online={friend.is_available}
-      />
+      {/* Tappable area: avatar + name */}
+      <button
+        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        onClick={() => { hapticLight(); onPress?.(); }}
+      >
+        <Avatar
+          name={friend.display_name}
+          id={friend.id}
+          src={friend.profile_picture}
+          online={!isMuted && friend.is_available}
+        />
 
-      <div className="flex-1 min-w-0">
-        <div className="flex justify-between items-center">
-          <span className="font-semibold text-sm truncate">
-            {friend.display_name}
-          </span>
-          {/* Show relative time for offline, nothing for available */}
-          {!friend.is_available && friend.last_seen && (
-            <span className="text-[11px] text-gray-300 flex-shrink-0 ml-2">
-              {relativeTime(friend.last_seen)}
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center gap-2">
+            <span className="font-semibold text-sm truncate">
+              {friend.display_name}
             </span>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {isMuted && (
+                <BellOff className="w-3 h-3 text-gray-400" />
+              )}
+              {!isMuted && !friend.is_available && friend.last_seen && (
+                <span className="text-[11px] text-gray-300">
+                  {relativeTime(friend.last_seen)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {!isMuted && friend.current_mood && (
+            <div className="flex items-center gap-1 mt-1">
+              <MessageCircle className="w-3 h-3 text-blue-500 flex-shrink-0" />
+              <span className="text-[12px] text-gray-500 truncate">
+                {friend.current_mood}
+              </span>
+            </div>
+          )}
+          {isMuted && (
+            <span className="text-[11px] text-gray-400 mt-0.5 block">Muted</span>
           )}
         </div>
+      </button>
 
-        {friend.current_mood && (
-          <div className="flex items-center gap-1 mt-1">
-            <MessageCircle className="w-3 h-3 text-blue-500 flex-shrink-0" />
-            <span className="text-[12px] text-gray-500 truncate">
-              {friend.current_mood}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Call button — always shown if phone number exists */}
-      {phoneClean ? (
+      {/* Call button — suppressed when muted */}
+      {!isMuted && phoneClean ? (
         friend.is_available ? (
           showCallLabel ? (
             <a
@@ -91,9 +110,11 @@ export function FriendCard({
           </a>
         )
       ) : (
-        <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-          <Phone className="w-[15px] h-[15px] text-gray-300" />
-        </div>
+        !isMuted && (
+          <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <Phone className="w-[15px] h-[15px] text-gray-300" />
+          </div>
+        )
       )}
     </div>
   );

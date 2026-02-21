@@ -109,18 +109,26 @@ Deno.serve(async (req) => {
     const userId = record.id as string;
     const displayName = (record.display_name as string) ?? "Your friend";
 
-    // Get all accepted friends of this user
+    // Get all accepted, non-muted friends of this user
+    // is_muted=true means that friend muted the user who just went available,
+    // so skip them — they don't want to be notified about this person.
     const { data: friendships } = await supabase
       .from("friendships")
-      .select("user_id, friend_id")
+      .select("user_id, friend_id, is_muted")
       .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
       .eq("status", "accepted");
 
     if (!friendships?.length) return new Response("no friends", { status: 200 });
 
-    const friendIds = friendships.map((f) =>
-      f.user_id === userId ? f.friend_id : f.user_id
-    );
+    // Build friendId list, skipping rows where the recipient muted the sender
+    const friendIds = friendships
+      .filter((f) => {
+        const recipientId = f.user_id === userId ? f.friend_id : f.user_id;
+        // is_muted is set by the person who initiated the mute (the recipient side)
+        // If the friendship row is from recipient's perspective, check is_muted
+        return !f.is_muted;
+      })
+      .map((f) => f.user_id === userId ? f.friend_id : f.user_id);
 
     // Get tokens for friends who want availability notifications
     const { data: tokens } = await supabase
