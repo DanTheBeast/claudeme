@@ -92,6 +92,17 @@ export default function DashboardLayout({
       }
     }, 5000);
 
+    // Register push after a short delay as a fallback in case
+    // fetchProfile completes before the supabase client is ready
+    const pushRetry = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        registerPushNotifications(session.user.id, supabase).catch((e) => {
+          console.error("[CallMe] push retry failed:", e);
+        });
+      }
+    }, 3000);
+
     fetchProfile();
 
     const handleVisibility = () => {
@@ -136,6 +147,7 @@ export default function DashboardLayout({
 
     return () => {
       clearTimeout(timeout);
+      clearTimeout(pushRetry);
       document.removeEventListener("visibilitychange", handleVisibility);
       subscription.unsubscribe();
       supabase.removeChannel(channel);
