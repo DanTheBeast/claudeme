@@ -251,6 +251,123 @@
       line-height: 1.6;
     }
 
+    /* ── Screenshots ── */
+    .screenshots-section {
+      background: var(--gray-900);
+      padding: 96px 0;
+      overflow: hidden;
+    }
+
+    .screenshots-section .section-label {
+      color: var(--orange-light);
+    }
+
+    .screenshots-section h2 {
+      color: var(--white);
+    }
+
+    .screenshots-inner {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .screenshots-row {
+      display: flex;
+      gap: 28px;
+      justify-content: center;
+      align-items: flex-start;
+      margin-top: 56px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+      padding: 0 24px 20px;
+      scrollbar-width: none;
+    }
+
+    .screenshots-row::-webkit-scrollbar { display: none; }
+
+    .screenshot-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      flex-shrink: 0;
+      scroll-snap-align: center;
+    }
+
+    .phone-frame {
+      position: relative;
+      width: 220px;
+    }
+
+    /* Phone bezel */
+    .phone-frame::before {
+      content: '';
+      position: absolute;
+      inset: -10px;
+      border-radius: 46px;
+      background: #1a1a1a;
+      box-shadow:
+        0 0 0 2px #333,
+        0 30px 80px rgba(0,0,0,0.6),
+        0 0 0 1px rgba(255,255,255,0.05) inset;
+      z-index: 0;
+    }
+
+    /* Notch */
+    .phone-frame::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90px;
+      height: 26px;
+      background: #1a1a1a;
+      border-radius: 0 0 18px 18px;
+      z-index: 2;
+    }
+
+    .phone-frame img {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      border-radius: 36px;
+      display: block;
+    }
+
+    .screenshot-caption {
+      text-align: center;
+    }
+
+    .screenshot-caption strong {
+      display: block;
+      color: var(--white);
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .screenshot-caption span {
+      color: rgba(255,255,255,0.45);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* On desktop: all three visible, no scroll needed */
+    @media (min-width: 780px) {
+      .screenshots-row {
+        overflow-x: visible;
+        padding: 0 24px;
+      }
+
+      /* Middle screenshot slightly elevated */
+      .screenshot-item:nth-child(2) .phone-frame {
+        transform: translateY(-18px);
+      }
+    }
+
     /* ── Features ── */
     .features-bg {
       background: var(--orange-50);
@@ -501,6 +618,43 @@
           <div class="step-num">3</div>
           <h3>Someone calls</h3>
           <p>They tap call. You pick up. You catch up. That's the whole product.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screenshots -->
+  <section class="screenshots-section">
+    <div class="screenshots-inner">
+      <p class="section-label">The app</p>
+      <h2>See it in action</h2>
+    </div>
+    <div class="screenshots-row">
+      <div class="screenshot-item">
+        <div class="phone-frame">
+          <img src="screen-home.png" alt="CallMe home screen showing availability and available friends" />
+        </div>
+        <div class="screenshot-caption">
+          <strong>Go available in one tap</strong>
+          <span>Set how long you're free.<br />Friends see it instantly.</span>
+        </div>
+      </div>
+      <div class="screenshot-item">
+        <div class="phone-frame">
+          <img src="screen-friends.png" alt="CallMe friends list showing available and offline friends" />
+        </div>
+        <div class="screenshot-caption">
+          <strong>See who's free right now</strong>
+          <span>Available friends float to the top.<br />One tap to call.</span>
+        </div>
+      </div>
+      <div class="screenshot-item">
+        <div class="phone-frame">
+          <img src="screen-schedule.png" alt="CallMe schedule view showing weekly availability overlaps" />
+        </div>
+        <div class="screenshot-caption">
+          <strong>Find the best time to connect</strong>
+          <span>Set your weekly windows.<br />CallMe finds the overlaps.</span>
         </div>
       </div>
     </div>
