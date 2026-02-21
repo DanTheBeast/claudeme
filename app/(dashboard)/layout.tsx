@@ -15,6 +15,7 @@ import { Toast } from "@/app/_components/toast";
 import type { Profile } from "@/app/_lib/types";
 import AuthPage from "@/app/auth/page";
 import { soundAppLaunch } from "@/app/_lib/haptics";
+import { registerPushNotifications } from "@/app/_lib/push-notifications";
 import { SplashScreen } from "@capacitor/splash-screen";
 
 interface AppContextType {
@@ -68,6 +69,8 @@ export default function DashboardLayout({
       if (!launchJinglePlayed.current) {
         launchJinglePlayed.current = true;
         setTimeout(() => soundAppLaunch(), 400);
+        // Register for push notifications once on first load
+        registerPushNotifications(session.user.id, supabase).catch(() => {});
       }
     } catch (e) {
       setAuthed(false);
