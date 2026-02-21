@@ -3,12 +3,15 @@
 @tailwind utilities;
 
 @layer base {
-  html, body {
+  html {
+    height: 100%;
+    width: 100%;
+    background-color: #FFFFFF;
+  }
+  body {
     height: 100%;
     width: 100%;
     background-color: #FDFBF9;
-  }
-  body {
     @apply text-gray-900 antialiased;
     font-family: 'DM Sans', system-ui, sans-serif;
     overflow-x: hidden;
@@ -28,12 +31,13 @@
   /* Extends the header background upward to cover iOS overscroll rubber-band gap */
   .app-header::before {
     content: '';
-    position: absolute;
-    top: -200px;
+    position: fixed;
+    top: -500px;
     left: 0;
     right: 0;
-    height: 200px;
-    background: inherit;
+    height: 500px;
+    background: #FFFFFF;
+    z-index: 29;
   }
 }
 

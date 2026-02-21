@@ -11,7 +11,9 @@ const config: CapacitorConfig = {
     androidScheme: "https",
   },
   ios: {
-    contentInset: "automatic",
+    contentInset: "never",
+    backgroundColor: "#FFFFFF",
+    scrollEnabled: true,
   },
   plugins: {
     StatusBar: {

@@ -17,6 +17,7 @@ import {
   Clock,
   MessageCircle,
   Camera,
+  Bug,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -147,7 +148,7 @@ export default function ProfilePage() {
 
   return (
     <div className="pb-24">
-      <header className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto relative overflow-visible" style={{ top: 0 }}>
+      <header className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col overflow-visible" style={{ top: 0 }}>
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Profile</h1>
@@ -353,6 +354,14 @@ export default function ProfilePage() {
             );
           })}
         </div>
+
+        {/* Report a Bug */}
+        <a
+          href="mailto:danfields5454@gmail.com?subject=CallMe%20Bug%20Report&body=Describe%20the%20bug%20here..."
+          className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
+        >
+          <Bug className="w-[18px] h-[18px]" /> Report a Bug
+        </a>
 
         {/* Sign Out */}
         <button

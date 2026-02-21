@@ -94,7 +94,7 @@ export default function AuthPage() {
               Get Started <ArrowRight className="w-[18px] h-[18px]" />
             </button>
             <p className="text-gray-300 text-[13px] mt-5">
-              Free to use · No ads · No algorithms
+              Free to use · No algorithms
             </p>
           </div>
         )}
