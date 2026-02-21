@@ -112,6 +112,9 @@ export default function DashboardLayout({
           .single();
         if (data) setUser(data as Profile);
         setAuthed(true);
+        registerPushNotifications(session.user.id, supabase).catch((e) => {
+          console.error("[CallMe] push registration failed:", e);
+        });
       } else {
         setUser(null);
         setAuthed(false);
