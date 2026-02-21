@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
+import { feedbackFriendAdded, feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { Avatar } from "@/app/_components/avatar";
 import { FriendCard } from "@/app/_components/friend-card";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
@@ -35,17 +36,30 @@ export default function FriendsPage() {
   const loadData = async () => {
     if (!user) return;
 
-    const { data: sent } = await supabase
+    console.log("[CallMe] loadData for user:", user.id, user.email);
+
+    // Check all friendships regardless of status
+    const { data: debugFriendships } = await supabase
+      .from("friendships")
+      .select("*")
+      .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+    console.log("[CallMe] all friendships for user:", JSON.stringify(debugFriendships));
+
+    const { data: sent, error: sentError } = await supabase
       .from("friendships")
       .select("id, status, friend_id")
       .eq("user_id", user.id)
       .eq("status", "accepted");
 
-    const { data: received } = await supabase
+    console.log("[CallMe] sent friendships:", sent?.length, sentError?.message);
+
+    const { data: received, error: receivedError } = await supabase
       .from("friendships")
       .select("id, status, user_id")
       .eq("friend_id", user.id)
       .eq("status", "accepted");
+
+    console.log("[CallMe] received friendships:", received?.length, receivedError?.message);
 
     const friendIds = [
       ...(sent || []).map((f) => f.friend_id),
@@ -136,8 +150,10 @@ export default function FriendsPage() {
       status: "pending",
     });
     if (error) {
+      feedbackError();
       toast("Failed to send request — maybe already sent?");
     } else {
+      feedbackFriendAdded();
       toast("Friend request sent! 🎉");
       setShowAdd(false);
       setSearchQuery("");
@@ -146,6 +162,7 @@ export default function FriendsPage() {
   };
 
   const acceptRequest = async (requestId: number) => {
+    feedbackSuccess();
     await supabase
       .from("friendships")
       .update({ status: "accepted" })
@@ -155,6 +172,7 @@ export default function FriendsPage() {
   };
 
   const declineRequest = async (requestId: number) => {
+    feedbackClick();
     await supabase.from("friendships").delete().eq("id", requestId);
     toast("Request declined");
     loadData();

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Users, Calendar, User } from "lucide-react";
+import { feedbackClick } from "@/app/_lib/haptics";
 
 const items = [
   { href: "/", icon: Home, label: "Home" },
@@ -16,13 +17,14 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100/80 z-40">
-      <div className="max-w-md mx-auto flex items-center justify-around py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+      <div className="max-w-md mx-auto flex items-center justify-around py-1.5 pb-6">
         {items.map(({ href, icon: Icon, label }) => {
           const active = pathname === href;
           return (
             <Link
               key={href}
               href={href}
+              onClick={() => feedbackClick()}
               className={`flex flex-col items-center gap-0.5 py-1.5 px-4 transition-colors ${
                 active
                   ? "text-callme"

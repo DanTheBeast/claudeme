@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "./layout";
+import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick } from "@/app/_lib/haptics";
 import { FriendCard } from "@/app/_components/friend-card";
 import {
   Phone,
@@ -95,6 +96,7 @@ export default function HomePage() {
   const toggleAvailability = async () => {
     if (!user) return;
     const newVal = !user.is_available;
+    if (newVal) feedbackToggleOn(); else feedbackToggleOff();
     await supabase
       .from("profiles")
       .update({ is_available: newVal, last_seen: new Date().toISOString() })
@@ -109,6 +111,7 @@ export default function HomePage() {
 
   const saveMood = async () => {
     if (!user) return;
+    feedbackSuccess();
     await supabase
       .from("profiles")
       .update({ current_mood: mood })

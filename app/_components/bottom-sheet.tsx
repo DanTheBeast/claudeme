@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { feedbackSheetOpen, feedbackClick } from "@/app/_lib/haptics";
+
 export function BottomSheet({
   open,
   onClose,
@@ -9,19 +12,49 @@ export function BottomSheet({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  // Play sound when sheet opens
+  useEffect(() => {
+    if (open) feedbackSheetOpen();
+  }, [open]);
+
+  // When keyboard appears, scroll focused input into view inside the sheet
+  useEffect(() => {
+    if (!open) return;
+    const handleFocus = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && sheetRef.current?.contains(target)) {
+        setTimeout(() => {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 300);
+      }
+    };
+    document.addEventListener("focusin", handleFocus);
+    return () => document.removeEventListener("focusin", handleFocus);
+  }, [open]);
+
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 bg-black/35 backdrop-blur-[6px] z-[200] flex items-end sm:items-center justify-center sm:p-4"
-      onClick={onClose}
+      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}
+      className="bg-black/35 backdrop-blur-[6px] flex items-end justify-center"
+      onClick={() => { feedbackClick(); onClose(); }}
     >
       <div
-        className="bg-white rounded-t-[28px] sm:rounded-[24px] max-w-[480px] w-full max-h-[88vh] overflow-y-auto anim-slide-up sm:anim-scale-in px-6 pb-8 pt-2"
+        ref={sheetRef}
+        className="bg-white rounded-t-[28px] overflow-y-auto overflow-x-hidden anim-slide-up px-6 pt-2"
+        style={{
+          maxHeight: "88vh",
+          paddingBottom: "calc(2rem + env(safe-area-inset-bottom))",
+          width: "100%",
+          maxWidth: "100vw",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag handle on mobile */}
-        <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mt-2 mb-5 sm:hidden" />
+        {/* Drag handle */}
+        <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mt-2 mb-5" />
         {children}
       </div>
     </div>

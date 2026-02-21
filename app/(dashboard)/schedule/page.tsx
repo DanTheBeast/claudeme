@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
+import { feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
 import { Avatar } from "@/app/_components/avatar";
 import { Calendar, Clock, Plus, X, Users, Phone } from "lucide-react";
@@ -141,8 +142,10 @@ export default function SchedulePage() {
       description: w.desc || null,
     });
     if (error) {
+      feedbackError();
       toast("Failed to add window");
     } else {
+      feedbackSuccess();
       toast("Availability added");
       setAddModal(null);
       loadWindows();
@@ -150,6 +153,7 @@ export default function SchedulePage() {
   };
 
   const removeWindow = async (id: number) => {
+    feedbackClick();
     await supabase.from("availability_windows").delete().eq("id", id);
     toast("Window removed");
     loadWindows();
@@ -240,7 +244,9 @@ export default function SchedulePage() {
             Loading schedule...
           </div>
         ) : (
-          DAYS.map((dayName, dayIdx) => {
+          // Show days starting from today, wrapping around the week
+          Array.from({ length: 7 }, (_, i) => (today + i) % 7).map((dayIdx) => {
+            const dayName = DAYS[dayIdx];
             const dayWindows = grouped[dayIdx] || [];
             const dayFriendWindows = friendGrouped[dayIdx] || [];
             const overlapping = getOverlappingFriends(dayIdx);

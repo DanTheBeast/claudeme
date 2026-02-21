@@ -1,10 +1,18 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "CallMe — Meaningful Phone Conversations",
   description:
     "Stay connected with friends and family through spontaneous phone calls. Know when people are available and enjoy real conversations.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({

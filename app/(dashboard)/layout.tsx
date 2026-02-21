@@ -6,11 +6,13 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
 } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { BottomNav } from "@/app/_components/bottom-nav";
 import { Toast } from "@/app/_components/toast";
 import type { Profile } from "@/app/_lib/types";
+import AuthPage from "@/app/auth/page";
 
 interface AppContextType {
   user: Profile | null;
@@ -33,31 +35,57 @@ export default function DashboardLayout({
 }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authed, setAuthed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const fetchProfile = useCallback(async () => {
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
-    if (!authUser) {
-      // No authenticated user — redirect to auth page
-      window.location.href = "/auth";
-      return;
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.user) {
+        setAuthed(false);
+        setLoading(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
+
+      if (data) setUser(data as Profile);
+      setAuthed(true);
+    } catch (e) {
+      setAuthed(false);
     }
-
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", authUser.id)
-      .single();
-
-    if (data) setUser(data as Profile);
     setLoading(false);
   }, [supabase]);
 
   useEffect(() => {
     fetchProfile();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        // Show loading spinner immediately so AuthPage doesn't flash
+        setLoading(true);
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+        if (data) setUser(data as Profile);
+        setAuthed(true);
+        setLoading(false);
+      } else {
+        setUser(null);
+        setAuthed(false);
+        setLoading(false);
+      }
+    });
 
     const channel = supabase
       .channel("profile-changes")
@@ -73,6 +101,7 @@ export default function DashboardLayout({
       .subscribe();
 
     return () => {
+      subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
   }, []);
@@ -90,6 +119,10 @@ export default function DashboardLayout({
         </div>
       </div>
     );
+  }
+
+  if (!authed) {
+    return <AuthPage />;
   }
 
   return (

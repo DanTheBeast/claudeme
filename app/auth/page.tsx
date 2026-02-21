@@ -56,15 +56,17 @@ export default function AuthPage() {
     setLoading(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    console.log("[CallMe] signIn data:", data?.user?.email, "error:", error?.message);
+
     if (error) {
       setMessage({ type: "error", text: error.message });
     } else {
-      window.location.href = "/";
+      setMessage({ type: "success", text: "Signed in! Loading..." });
     }
     setLoading(false);
   };

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackError } from "@/app/_lib/haptics";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
 import { Avatar } from "@/app/_components/avatar";
@@ -15,6 +16,7 @@ import {
   Users,
   Clock,
   MessageCircle,
+  Camera,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -24,6 +26,8 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [editing, setEditing] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState({
     display_name: user?.display_name || "",
     phone_number: user?.phone_number || "",
@@ -43,16 +47,46 @@ export default function ProfilePage() {
       })
       .eq("id", user.id);
     if (error) {
+      feedbackError();
       toast("Failed to save — username may already be taken");
     } else {
+      feedbackSuccess();
       await refreshUser();
       setEditing(false);
       toast("Profile updated! ✅");
     }
   };
 
+  const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    setUploadingPhoto(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `${user.id}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(path);
+      const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
+      await supabase
+        .from("profiles")
+        .update({ profile_picture: publicUrl })
+        .eq("id", user.id);
+      await refreshUser();
+      toast("Photo updated!");
+    } catch {
+      toast("Failed to upload photo");
+    }
+    setUploadingPhoto(false);
+  };
+
   const updateSetting = async (key: string, value: boolean) => {
     if (!user) return;
+    if (value) feedbackToggleOn(); else feedbackToggleOff();
     await supabase
       .from("profiles")
       .update({ [key]: value })
@@ -152,12 +186,30 @@ export default function ProfilePage() {
         {/* Profile card */}
         <div className="bg-white rounded-[22px] p-7 shadow-sm border border-gray-100 anim-fade-up">
           <div className="text-center mb-5">
-            <div className="inline-block mb-3">
+            <div className="inline-block mb-3 relative">
               <Avatar
                 name={user.display_name}
                 id={user.id}
                 size="lg"
                 src={user.profile_picture}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="absolute bottom-0 right-0 w-8 h-8 bg-callme rounded-full flex items-center justify-center shadow-md border-2 border-white"
+              >
+                {uploadingPhoto ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4 text-white" />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={uploadPhoto}
               />
             </div>
             {editing ? (

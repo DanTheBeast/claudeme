@@ -3,6 +3,7 @@
 import { Avatar } from "./avatar";
 import { Phone, MessageCircle } from "lucide-react";
 import type { Profile } from "@/app/_lib/types";
+import { hapticMedium } from "@/app/_lib/haptics";
 
 function relativeTime(d: string | Date): string {
   const ms = Date.now() - new Date(d).getTime();
@@ -60,21 +61,33 @@ export function FriendCard({
         )}
       </div>
 
-      {/* Call button — prominent with label for available, muted icon for offline */}
-      {friend.is_available ? (
-        showCallLabel ? (
-          <a
-            href={phoneClean ? `tel:${phoneClean}` : undefined}
-            className="callme-gradient text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all flex-shrink-0"
-          >
-            <Phone className="w-3.5 h-3.5" /> Call
-          </a>
+      {/* Call button — always shown if phone number exists */}
+      {phoneClean ? (
+        friend.is_available ? (
+          showCallLabel ? (
+            <a
+              href={`tel:${phoneClean}`}
+              onClick={() => hapticMedium()}
+              className="callme-gradient text-white px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all flex-shrink-0"
+            >
+              <Phone className="w-3.5 h-3.5" /> Call
+            </a>
+          ) : (
+            <a
+              href={`tel:${phoneClean}`}
+              onClick={() => hapticMedium()}
+              className="w-10 h-10 callme-gradient rounded-full flex items-center justify-center flex-shrink-0 hover:shadow-md hover:shadow-callme/25 hover:scale-105 transition-all"
+            >
+              <Phone className="w-[17px] h-[17px] text-white" />
+            </a>
+          )
         ) : (
           <a
-            href={phoneClean ? `tel:${phoneClean}` : undefined}
-            className="w-10 h-10 callme-gradient rounded-full flex items-center justify-center flex-shrink-0 hover:shadow-md hover:shadow-callme/25 hover:scale-105 transition-all"
+            href={`tel:${phoneClean}`}
+            onClick={() => hapticMedium()}
+            className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-gray-200 transition-all"
           >
-            <Phone className="w-[17px] h-[17px] text-white" />
+            <Phone className="w-[15px] h-[15px] text-gray-400" />
           </a>
         )
       ) : (
