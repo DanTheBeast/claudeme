@@ -130,7 +130,7 @@ export default function HomePage() {
     <div className="pb-24">
       {/* Header — fixed, with explicit safe-area top padding */}
       <header
-        className="bg-white/95 backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto"
+        className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto relative overflow-visible"
         style={{ top: 0 }}
       >
         {/* Safe area spacer */}

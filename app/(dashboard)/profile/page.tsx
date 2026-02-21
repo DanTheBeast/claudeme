@@ -147,7 +147,7 @@ export default function ProfilePage() {
 
   return (
     <div className="pb-24">
-      <header className="bg-white/95 backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto" style={{ top: 0 }}>
+      <header className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto relative overflow-visible" style={{ top: 0 }}>
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Profile</h1>

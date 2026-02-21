@@ -6,14 +6,14 @@
   html, body {
     height: 100%;
     width: 100%;
+    background-color: #FDFBF9;
   }
   body {
-    @apply bg-[#FDFBF9] text-gray-900 antialiased;
+    @apply text-gray-900 antialiased;
     font-family: 'DM Sans', system-ui, sans-serif;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    /* iOS safe areas via env() on fixed elements directly */
   }
   *, *::before, *::after {
     box-sizing: border-box;
@@ -23,6 +23,17 @@
 @layer components {
   .callme-gradient {
     @apply bg-gradient-to-br from-callme-light to-callme-dark;
+  }
+
+  /* Extends the header background upward to cover iOS overscroll rubber-band gap */
+  .app-header::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: inherit;
   }
 }
 
