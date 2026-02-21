@@ -188,7 +188,7 @@ export default function SchedulePage() {
 
   return (
     <div className="pb-24">
-      <header className="bg-white border-b border-gray-100/80 sticky top-0 z-30 px-5 py-3.5 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-100/80 sticky z-30 px-5 py-3.5 flex items-center justify-between" style={{ top: 0 }}>
         <div className="flex items-center gap-2">
           <Calendar className="w-[18px] h-[18px] text-callme" />
           <h1 className="font-display text-xl font-bold">Schedule</h1>

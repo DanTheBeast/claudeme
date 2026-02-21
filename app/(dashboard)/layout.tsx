@@ -7,12 +7,15 @@ import {
   useState,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { BottomNav } from "@/app/_components/bottom-nav";
 import { Toast } from "@/app/_components/toast";
 import type { Profile } from "@/app/_lib/types";
 import AuthPage from "@/app/auth/page";
+import { soundAppLaunch } from "@/app/_lib/haptics";
+import { SplashScreen } from "@capacitor/splash-screen";
 
 interface AppContextType {
   user: Profile | null;
@@ -38,6 +41,7 @@ export default function DashboardLayout({
   const [authed, setAuthed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
+  const launchJinglePlayed = useRef(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -59,14 +63,29 @@ export default function DashboardLayout({
 
       if (data) setUser(data as Profile);
       setAuthed(true);
+      // Play launch jingle only once on first load
+      if (!launchJinglePlayed.current) {
+        launchJinglePlayed.current = true;
+        setTimeout(() => soundAppLaunch(), 400);
+      }
     } catch (e) {
       setAuthed(false);
     }
     setLoading(false);
+    // Hide splash screen as soon as app is ready
+    try { await SplashScreen.hide(); } catch {}
   }, [supabase]);
 
   useEffect(() => {
     fetchProfile();
+
+    // Re-check session when app comes back to foreground
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchProfile();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
@@ -101,6 +120,7 @@ export default function DashboardLayout({
       .subscribe();
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
       subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
@@ -112,9 +132,7 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen bg-[#FDFBF9] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-14 h-14 callme-gradient rounded-[18px] flex items-center justify-center mx-auto mb-3 animate-pulse">
-            <div className="w-6 h-6 bg-white/30 rounded-lg" />
-          </div>
+          <img src="/logo.png" alt="CallMe" className="w-14 h-14 rounded-[18px] mx-auto mb-3 animate-pulse" />
           <p className="text-gray-400 text-sm">Loading...</p>
         </div>
       </div>

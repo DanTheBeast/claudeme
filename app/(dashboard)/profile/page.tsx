@@ -359,9 +359,7 @@ export default function ProfilePage() {
 
         {/* App info */}
         <div className="bg-white rounded-[22px] p-6 shadow-sm border border-gray-100 text-center">
-          <div className="w-12 h-12 callme-gradient rounded-[14px] flex items-center justify-center mx-auto mb-3">
-            <Phone className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo.png" alt="CallMe" className="w-12 h-12 rounded-[14px] mx-auto mb-3" />
           <h3 className="font-display font-bold">CallMe</h3>
           <p className="text-xs text-gray-400 mt-0.5">Version 1.0.0</p>
           <p className="text-xs text-gray-300 mt-1">

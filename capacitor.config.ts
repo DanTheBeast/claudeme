@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.callme.app",
+  appId: "com.danfields5454.callme",
   appName: "CallMe",
   webDir: "out",
   server: {
@@ -19,8 +19,8 @@ const config: CapacitorConfig = {
       backgroundColor: "#FFFFFF",
     },
     SplashScreen: {
-      launchAutoHide: true,
-      launchShowDuration: 1500,
+      launchAutoHide: false,
+      launchShowDuration: 0,
       backgroundColor: "#FDFBF9",
       showSpinner: false,
     },

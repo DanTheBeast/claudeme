@@ -78,9 +78,7 @@ export default function AuthPage() {
         {/* Step 0: Splash */}
         {step === 0 && (
           <div className="text-center anim-fade-up">
-            <div className="w-[88px] h-[88px] rounded-[26px] callme-gradient flex items-center justify-center mx-auto mb-7 shadow-lg shadow-callme/25 anim-float">
-              <Phone className="w-10 h-10 text-white" />
-            </div>
+            <img src="/logo.png" alt="CallMe" className="w-[88px] h-[88px] rounded-[26px] mx-auto mb-7 shadow-lg shadow-callme/25 anim-float" />
             <h1 className="font-display text-[42px] font-bold text-gray-900 tracking-tight">
               CallMe
             </h1>

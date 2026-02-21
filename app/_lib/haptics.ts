@@ -101,6 +101,52 @@ export function soundFriendAdded() {
   setTimeout(() => playTone(784, 0.15, "sine", 0.14), 180);
 }
 
+// App launch mnemonic — warm 4-note rising chime
+export function soundAppLaunch() {
+  const ac = getCtx();
+  if (!ac) return;
+
+  // Notes: E4 → G4 → B4 → E5 (a warm, friendly E major arpeggio)
+  const notes = [329.63, 392.00, 493.88, 659.25];
+  const timings = [0, 0.13, 0.26, 0.42];
+  const durations = [0.25, 0.25, 0.25, 0.55];
+  const gains = [0.13, 0.13, 0.14, 0.18];
+
+  notes.forEach((freq, i) => {
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    // Add a tiny bit of warmth with a second osc an octave up at low volume
+    const osc2 = ac.createOscillator();
+    const gain2 = ac.createGain();
+
+    osc.connect(gain);
+    osc2.connect(gain2);
+    gain.connect(ac.destination);
+    gain2.connect(ac.destination);
+
+    osc.type = "sine";
+    osc2.type = "sine";
+    osc.frequency.setValueAtTime(freq, ac.currentTime);
+    osc2.frequency.setValueAtTime(freq * 2, ac.currentTime);
+
+    const t = ac.currentTime + timings[i];
+    const dur = durations[i];
+
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(gains[i], t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+    gain2.gain.setValueAtTime(0, t);
+    gain2.gain.linearRampToValueAtTime(gains[i] * 0.25, t + 0.02);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+    osc.start(t);
+    osc.stop(t + dur);
+    osc2.start(t);
+    osc2.stop(t + dur);
+  });
+}
+
 // Combined helpers (haptic + sound together)
 export function feedbackClick() { hapticLight(); soundClick(); }
 export function feedbackSuccess() { hapticSuccess(); soundSuccess(); }

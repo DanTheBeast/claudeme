@@ -129,11 +129,9 @@ export default function HomePage() {
   return (
     <div className="pb-24">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100/80 sticky top-0 z-30 px-5 py-3.5 flex items-center justify-between">
+      <header className="bg-white border-b border-gray-100/80 sticky z-30 px-5 py-3.5 flex items-center justify-between" style={{ top: 0 }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 callme-gradient rounded-[10px] flex items-center justify-center">
-            <Phone className="w-4 h-4 text-white" />
-          </div>
+          <img src="/logo.png" alt="CallMe" className="w-8 h-8 rounded-[10px]" />
           <span className="font-display text-xl font-bold">CallMe</span>
         </div>
         <span className="text-sm text-gray-400">
