@@ -34,13 +34,20 @@ function timesOverlap(
   aStart: string,
   aEnd: string,
   bStart: string,
-  bEnd: string
+  bEnd: string,
+  nowMinutes?: number  // if provided, the overlap must not have already ended
 ): boolean {
   const a0 = timeToMinutes(aStart);
   const a1 = timeToMinutes(aEnd);
   const b0 = timeToMinutes(bStart);
   const b1 = timeToMinutes(bEnd);
-  return a0 < b1 && b0 < a1;
+  if (!(a0 < b1 && b0 < a1)) return false;
+  // For today: the overlap window ends at min(a1, b1) — if that's in the past, no match
+  if (nowMinutes !== undefined) {
+    const overlapEnd = Math.min(a1, b1);
+    if (overlapEnd <= nowMinutes) return false;
+  }
+  return true;
 }
 
 interface FriendWindow extends AvailabilityWindow {
@@ -173,22 +180,27 @@ export default function SchedulePage() {
     (friendGrouped[w.day_of_week] = friendGrouped[w.day_of_week] || []).push(w);
   });
 
-  // Find overlaps for a given day: friend windows that overlap with any of user's windows
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // Find overlaps for a given day: friend windows that overlap with any of user's windows.
+  // For today, only count overlaps whose window hasn't already ended.
   const getOverlappingFriends = (dayIdx: number): FriendWindow[] => {
     const myWindows = grouped[dayIdx] || [];
     const theirWindows = friendGrouped[dayIdx] || [];
     if (myWindows.length === 0) return [];
+    const isToday = dayIdx === today;
 
     return theirWindows.filter((fw) =>
       myWindows.some((mw) =>
-        timesOverlap(mw.start_time, mw.end_time, fw.start_time, fw.end_time)
+        timesOverlap(mw.start_time, mw.end_time, fw.start_time, fw.end_time, isToday ? nowMinutes : undefined)
       )
     );
   };
 
   return (
     <div className="pb-24">
-      <header className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col max-w-md mx-auto relative overflow-visible" style={{ top: 0 }}>
+      <header className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col overflow-visible" style={{ top: 0 }}>
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -354,7 +366,8 @@ export default function SchedulePage() {
                               mw.start_time,
                               mw.end_time,
                               fw.start_time,
-                              fw.end_time
+                              fw.end_time,
+                              isToday ? nowMinutes : undefined
                             )
                           );
 
