@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CallMe — Call your friends, not the algorithm</title>
+  <meta name="description" content="CallMe lets you and your friends share when you're free to talk — no feed, no likes, no algorithms. Just real phone calls with people you actually care about." />
+  <meta property="og:title" content="CallMe — Call your friends, not the algorithm" />
+  <meta property="og:description" content="Share when you're free. Your friends see it. They call you. That's it." />
+  <meta property="og:image" content="og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@justcallmeapp" />
+  <link rel="icon" href="favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange: #D46B50;
+      --orange-light: #DE7F65;
+      --orange-dark: #C05840;
+      --orange-50: #FDF3F0;
+      --orange-100: #FADED8;
+      --green: #10B981;
+      --gray-900: #111827;
+      --gray-700: #374151;
+      --gray-500: #6B7280;
+      --gray-300: #D1D5DB;
+      --gray-100: #F3F4F6;
+      --white: #FFFFFF;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--gray-900);
+      background: var(--white);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--gray-900);
+    }
+
+    .nav-logo img {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+    }
+
+    .nav-logo span {
+      font-family: 'Sora', sans-serif;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .nav-cta {
+      background: var(--orange);
+      color: white;
+      text-decoration: none;
+      padding: 8px 18px;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .nav-cta:hover { background: var(--orange-dark); transform: translateY(-1px); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 140px 24px 100px;
+      text-align: center;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: var(--orange-50);
+      border: 1px solid var(--orange-100);
+      color: var(--orange-dark);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+    }
+
+    .hero-badge .dot {
+      width: 7px;
+      height: 7px;
+      background: var(--orange);
+      border-radius: 50%;
+    }
+
+    h1 {
+      font-family: 'Sora', sans-serif;
+      font-size: clamp(38px, 7vw, 62px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 22px;
+    }
+
+    h1 .accent { color: var(--orange); }
+
+    .hero-sub {
+      font-size: clamp(16px, 2.5vw, 19px);
+      color: var(--gray-500);
+      line-height: 1.65;
+      margin-bottom: 40px;
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-tagline {
+      font-size: 13px;
+      color: var(--gray-500);
+      margin-top: 14px;
+      letter-spacing: 0.01em;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--orange);
+      color: white;
+      text-decoration: none;
+      padding: 16px 32px;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px rgba(212,107,80,0.35);
+    }
+
+    .btn-primary:hover {
+      background: var(--orange-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(212,107,80,0.4);
+    }
+
+    .btn-primary svg { width: 20px; height: 20px; }
+
+    /* ── How it works ── */
+    .section {
+      padding: 96px 24px;
+    }
+
+    .section-inner {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--orange);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    h2 {
+      font-family: 'Sora', sans-serif;
+      font-size: clamp(28px, 5vw, 42px);
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    /* Steps */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+    }
+
+    .step {
+      background: var(--white);
+      border: 1px solid var(--gray-100);
+      border-radius: 22px;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .step:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    }
+
+    .step-num {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Sora', sans-serif;
+      font-weight: 800;
+      font-size: 18px;
+      color: white;
+      margin: 0 auto 18px;
+      box-shadow: 0 4px 12px rgba(212,107,80,0.3);
+    }
+
+    .step h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .step p {
+      font-size: 14px;
+      color: var(--gray-500);
+      line-height: 1.6;
+    }
+
+    /* ── Features ── */
+    .features-bg {
+      background: var(--orange-50);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .feature {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 28px 24px;
+      border: 1px solid var(--orange-100);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .feature:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(212,107,80,0.1);
+    }
+
+    .feature-icon {
+      font-size: 28px;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .feature h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .feature p {
+      font-size: 14px;
+      color: var(--gray-500);
+      line-height: 1.6;
+    }
+
+    /* ── Manifesto ── */
+    .manifesto {
+      background: linear-gradient(135deg, var(--orange) 0%, var(--orange-dark) 100%);
+      color: white;
+    }
+
+    .manifesto h2 {
+      color: white;
+      margin-bottom: 20px;
+    }
+
+    .manifesto p {
+      font-size: clamp(16px, 2vw, 19px);
+      line-height: 1.7;
+      opacity: 0.88;
+      max-width: 620px;
+      margin: 0 auto 16px;
+      text-align: center;
+    }
+
+    .manifesto-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 36px;
+    }
+
+    .manifesto-pill {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.25);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 100px;
+    }
+
+    /* ── Download CTA ── */
+    .download-section {
+      text-align: center;
+      padding: 96px 24px;
+    }
+
+    .download-section h2 { margin-bottom: 16px; }
+
+    .download-section .sub {
+      font-size: 17px;
+      color: var(--gray-500);
+      margin-bottom: 40px;
+    }
+
+    .app-store-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--gray-900);
+      color: white;
+      text-decoration: none;
+      padding: 14px 28px;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 600;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    .app-store-btn:hover {
+      background: #000;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.2);
+    }
+
+    .app-store-btn svg { width: 24px; height: 24px; }
+
+    .app-store-btn .btn-text { text-align: left; line-height: 1.2; }
+    .app-store-btn .btn-text small { display: block; font-size: 11px; font-weight: 400; opacity: 0.7; }
+    .app-store-btn .btn-text strong { font-size: 16px; }
+
+    /* ── Contact ── */
+    .contact-section {
+      background: var(--gray-100);
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .contact-section h2 { margin-bottom: 12px; }
+
+    .contact-section .sub {
+      font-size: 16px;
+      color: var(--gray-500);
+      margin-bottom: 36px;
+    }
+
+    .contact-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      justify-content: center;
+    }
+
+    .contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: var(--white);
+      border: 1px solid var(--gray-300);
+      color: var(--gray-700);
+      text-decoration: none;
+      padding: 12px 22px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 500;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    }
+
+    .contact-link:hover {
+      border-color: var(--orange);
+      color: var(--orange-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(212,107,80,0.12);
+    }
+
+    .contact-link svg { width: 18px; height: 18px; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 32px 24px;
+      text-align: center;
+      border-top: 1px solid var(--gray-100);
+      font-size: 13px;
+      color: var(--gray-500);
+    }
+
+    footer a { color: var(--gray-500); text-decoration: none; }
+    footer a:hover { color: var(--orange); }
+
+    /* ── Availability indicator animation ── */
+    @keyframes pulse-green {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.5); }
+      50% { box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+    }
+
+    .live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse-green 1.8s ease-in-out infinite;
+      vertical-align: middle;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .hero { padding: 110px 20px 80px; }
+      .section { padding: 72px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="#" class="nav-logo">
+      <img src="../public/logo.png" alt="CallMe" />
+      <span>CallMe</span>
+    </a>
+    <a href="https://apps.apple.com/app/callme" class="nav-cta">Download</a>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      Coming soon to the App Store
+    </div>
+    <h1>Call your friends,<br />not the <span class="accent">algorithm</span></h1>
+    <p class="hero-sub">
+      CallMe lets you share when you're free to talk. Your friends see it instantly and can call you. No feed. No likes. No endless scrolling. Just real conversations with people you actually care about.
+    </p>
+    <a href="https://apps.apple.com/app/callme" class="btn-primary">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+      Download on the App Store
+    </a>
+    <p class="hero-tagline">No algorithms &nbsp;&middot;&nbsp; No AI &nbsp;&middot;&nbsp; Just friends</p>
+  </section>
+
+  <!-- How it works -->
+  <section class="section">
+    <div class="section-inner">
+      <p class="section-label">How it works</p>
+      <h2>Three taps to a real conversation</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h3>Go available</h3>
+          <p>Tap to say you're free — for 15 minutes, an hour, or until you turn it off. Your friends see it instantly.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h3>Friends get notified</h3>
+          <p>The people you care about get a nudge. No algorithm, no middleman — just a direct ping that you're around.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h3>Someone calls</h3>
+          <p>They tap call. You pick up. You catch up. That's the whole product.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section features-bg">
+    <div class="section-inner">
+      <p class="section-label">Features</p>
+      <h2>Everything you need.<br />Nothing you don't.</h2>
+      <div class="features-grid">
+        <div class="feature">
+          <span class="feature-icon">⏱</span>
+          <h3>Availability timers</h3>
+          <p>Set a duration — 15 min, 30 min, 1 hour, 2 hours — and CallMe turns you off automatically when time's up.</p>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">🔔</span>
+          <h3>Instant push notifications</h3>
+          <p>Your friends get notified the moment you go available. No polling, no delays.</p>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">📅</span>
+          <h3>Schedule matching</h3>
+          <p>Set your weekly availability windows. CallMe finds overlaps with your friends and surfaces the best times to connect.</p>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">🔇</span>
+          <h3>Mute without drama</h3>
+          <p>Mute a friend's notifications silently. They won't know, and you won't feel guilty. Life happens.</p>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">💬</span>
+          <h3>Status messages</h3>
+          <p>Leave a quick note about what you're up for — a catch-up, a rant, or just a vibe check. Your friends will know before they call.</p>
+        </div>
+        <div class="feature">
+          <span class="feature-icon">🔒</span>
+          <h3>Friends only</h3>
+          <p>No public profiles, no follower counts, no strangers. Just the people you've chosen to let in.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Manifesto -->
+  <section class="section manifesto">
+    <div class="section-inner">
+      <h2>We miss phone calls.</h2>
+      <p>Social media was supposed to keep us connected. Instead it gave us likes, algorithms, and the anxiety of a never-ending feed.</p>
+      <p>CallMe is a bet that the best way to stay close to someone is still just calling them — you just need to know when they're free.</p>
+      <div class="manifesto-pills">
+        <span class="manifesto-pill">No feed</span>
+        <span class="manifesto-pill">No followers</span>
+        <span class="manifesto-pill">No ads</span>
+        <span class="manifesto-pill">No algorithm</span>
+        <span class="manifesto-pill">No AI</span>
+        <span class="manifesto-pill">Just friends</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download -->
+  <section class="download-section">
+    <p class="section-label">Get the app</p>
+    <h2>Ready to actually<br />talk to your friends?</h2>
+    <p class="sub">Free on iOS. No subscription. No catch.</p>
+    <a href="https://apps.apple.com/app/callme" class="app-store-btn">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+      <div class="btn-text">
+        <small>Download on the</small>
+        <strong>App Store</strong>
+      </div>
+    </a>
+  </section>
+
+  <!-- Contact -->
+  <section class="contact-section">
+    <div class="section-inner">
+      <h2>Get in touch</h2>
+      <p class="sub">Questions, feedback, or just want to say hi — we're real people and we actually read these.</p>
+      <div class="contact-links">
+        <a href="mailto:danfields5454@gmail.com" class="contact-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          danfields5454@gmail.com
+        </a>
+        <a href="https://x.com/justcallmeapp" target="_blank" rel="noopener" class="contact-link">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          @justcallmeapp
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 CallMe &nbsp;&middot;&nbsp; <a href="mailto:danfields5454@gmail.com">Contact</a> &nbsp;&middot;&nbsp; <a href="https://x.com/justcallmeapp" target="_blank" rel="noopener">@justcallmeapp</a></p>
+  </footer>
+
+</body>
+</html>
