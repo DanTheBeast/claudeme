@@ -8,7 +8,7 @@
  * that covers the current day + time, send each a push notification
  * (once per slot, tracked in notified_schedule_matches).
  *
- * Recommended cron: every 5 minutes  →  "*/5 * * * *"
+ * Recommended cron schedule: every 5 minutes
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";

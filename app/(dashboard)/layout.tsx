@@ -69,9 +69,11 @@ export default function DashboardLayout({
       if (!launchJinglePlayed.current) {
         launchJinglePlayed.current = true;
         setTimeout(() => soundAppLaunch(), 400);
-        // Register for push notifications once on first load
-        registerPushNotifications(session.user.id, supabase).catch(() => {});
       }
+      // Register for push on every launch (token may change)
+      registerPushNotifications(session.user.id, supabase).catch((e) => {
+        console.error("[CallMe] push registration failed:", e);
+      });
     } catch (e) {
       setAuthed(false);
     }
