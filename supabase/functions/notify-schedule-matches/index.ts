@@ -32,10 +32,14 @@ async function getApnsJwt(): Promise<string> {
     .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
   const signingInput = `${header}.${payload}`;
 
-  const pemBody = APNS_KEY_P8
+  // APNS_KEY_P8 is stored as base64(full .p8 file contents) to avoid newline issues
+  const pemText = new TextDecoder().decode(
+    Uint8Array.from(atob(APNS_KEY_P8), (c) => c.charCodeAt(0))
+  );
+  const pemBody = pemText
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
-    .replace(/[\s|]/g, "");  // strip whitespace and pipe chars from tr newline workaround
+    .replace(/\s/g, "");
 
   const keyData = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
   const cryptoKey = await crypto.subtle.importKey(
