@@ -53,6 +53,14 @@ export default function HomePage() {
   const [countdown, setCountdown] = useState<string | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Optimistic UI overrides — set immediately on tap, cleared after refreshUser resolves
+  const [localAvailable, setLocalAvailable] = useState<boolean | null>(null);
+  const [localAvailableUntil, setLocalAvailableUntil] = useState<string | null | undefined>(undefined);
+
+  // Derived effective values — use local optimistic state while DB round-trip is in flight
+  const isAvailable = localAvailable !== null ? localAvailable : (user?.is_available ?? false);
+  const availableUntil = localAvailableUntil !== undefined ? localAvailableUntil : (user?.available_until ?? null);
+
   useEffect(() => {
     if (!user) return;
 
@@ -120,24 +128,29 @@ export default function HomePage() {
     };
   }, [user]);
 
-  // Countdown ticker — starts/clears based on available_until
+  // Countdown ticker — starts/clears based on effective availableUntil
   useEffect(() => {
     if (countdownRef.current) clearInterval(countdownRef.current);
 
-    if (user?.is_available && user.available_until) {
+    if (isAvailable && availableUntil) {
       const tick = () => {
-        const ms = new Date(user.available_until!).getTime() - Date.now();
+        const ms = new Date(availableUntil).getTime() - Date.now();
         if (ms <= 0) {
           // Expired — turn off automatically
           setCountdown(null);
           clearInterval(countdownRef.current!);
+          setLocalAvailable(false);
+          setLocalAvailableUntil(null);
           supabase
             .from("profiles")
             .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
-            .eq("id", user.id)
-            .then(() => refreshUser());
+            .eq("id", user!.id)
+            .then(() => refreshUser().then(() => {
+              setLocalAvailable(null);
+              setLocalAvailableUntil(undefined);
+            }));
         } else {
-          setCountdown(formatCountdown(user.available_until!));
+          setCountdown(formatCountdown(availableUntil));
         }
       };
       tick();
@@ -147,7 +160,7 @@ export default function HomePage() {
     }
 
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
-  }, [user?.is_available, user?.available_until]);
+  }, [isAvailable, availableUntil]);
 
   const goAvailable = async (minutes: number | null) => {
     if (!user) return;
@@ -155,28 +168,40 @@ export default function HomePage() {
     const available_until = minutes
       ? new Date(Date.now() + minutes * 60 * 1000).toISOString()
       : null;
+    // Optimistic update — flip UI immediately before DB round-trip
+    setLocalAvailable(true);
+    setLocalAvailableUntil(available_until);
+    setShowDurationPicker(false);
     await supabase
       .from("profiles")
       .update({ is_available: true, available_until, last_seen: new Date().toISOString() })
       .eq("id", user.id);
     await refreshUser();
-    setShowDurationPicker(false);
+    // Clear overrides — context is now up to date
+    setLocalAvailable(null);
+    setLocalAvailableUntil(undefined);
     toast(minutes ? `You're available for ${DURATIONS.find(d => d.minutes === minutes)?.label}! 📞` : "You're available! 📞");
   };
 
   const goUnavailable = async () => {
     if (!user) return;
     feedbackToggleOff();
+    // Optimistic update — flip UI immediately
+    setLocalAvailable(false);
+    setLocalAvailableUntil(null);
     await supabase
       .from("profiles")
       .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
       .eq("id", user.id);
     await refreshUser();
+    // Clear overrides — context is now up to date
+    setLocalAvailable(null);
+    setLocalAvailableUntil(undefined);
     toast("You're now unavailable");
   };
 
   const handleAvailabilityTap = () => {
-    if (user?.is_available) {
+    if (isAvailable) {
       goUnavailable();
     } else {
       setShowDurationPicker(true);
@@ -227,7 +252,7 @@ export default function HomePage() {
         {/* ── Compact availability strip (not a giant circle) ── */}
         <div
           className={`bg-white rounded-[18px] border p-4 flex items-center justify-between shadow-sm anim-fade-up ${
-            user.is_available
+            isAvailable
               ? "border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white"
               : "border-gray-100"
           }`}
@@ -236,12 +261,12 @@ export default function HomePage() {
             <button
               onClick={handleAvailabilityTap}
               className={`w-14 h-14 rounded-full border-none cursor-pointer flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
-                user.is_available
+                isAvailable
                   ? "bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/25 glow-green"
                   : "callme-gradient shadow-lg shadow-callme/25"
               }`}
             >
-              {user.is_available ? (
+              {isAvailable ? (
                 <Phone className="w-6 h-6 text-white" />
               ) : (
                 <PhoneOff className="w-6 h-6 text-white" />
@@ -249,10 +274,10 @@ export default function HomePage() {
             </button>
             <div>
               <p className="font-semibold text-[15px]">
-                {user.is_available ? "You're available" : "You're unavailable"}
+                {isAvailable ? "You're available" : "You're unavailable"}
               </p>
               <p className="text-[12px] text-gray-400 mt-0.5 flex items-center gap-1">
-                {user.is_available ? (
+                {isAvailable ? (
                   countdown ? (
                     <><Timer className="w-3 h-3 text-emerald-500" />{countdown}</>
                   ) : (
@@ -266,7 +291,7 @@ export default function HomePage() {
           </div>
           <div
             className={`w-3 h-3 rounded-full ${
-              user.is_available ? "bg-emerald-500 status-pulse" : "bg-gray-300"
+              isAvailable ? "bg-emerald-500 status-pulse" : "bg-gray-300"
             }`}
           />
         </div>
