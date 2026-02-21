@@ -102,11 +102,12 @@ Deno.serve(async () => {
   // Index active users
   const activeUserIds = [...new Set(activeWindows.map((w) => w.user_id))];
 
-  // Find friend pairs where BOTH are active right now
+  // Find friend pairs where BOTH are active right now and neither has muted the other
   const { data: friendships } = await supabase
     .from("friendships")
-    .select("user_id, friend_id")
+    .select("user_id, friend_id, is_muted")
     .eq("status", "accepted")
+    .eq("is_muted", false)
     .in("user_id", activeUserIds)
     .in("friend_id", activeUserIds);
 

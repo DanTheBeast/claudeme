@@ -83,22 +83,23 @@ export default function SchedulePage() {
 
     setWindows((data || []) as AvailabilityWindow[]);
 
-    // Load friends
+    // Load friends — exclude muted ones (mute is bidirectional:
+    // if either side muted the other, hide schedule windows for both)
     const { data: sent } = await supabase
       .from("friendships")
-      .select("friend_id")
+      .select("friend_id, is_muted")
       .eq("user_id", user.id)
       .eq("status", "accepted");
 
     const { data: received } = await supabase
       .from("friendships")
-      .select("user_id")
+      .select("user_id, is_muted")
       .eq("friend_id", user.id)
       .eq("status", "accepted");
 
     const friendIds = [
-      ...(sent || []).map((f) => f.friend_id),
-      ...(received || []).map((f) => f.user_id),
+      ...(sent || []).filter((f) => !f.is_muted).map((f) => f.friend_id),
+      ...(received || []).filter((f) => !f.is_muted).map((f) => f.user_id),
     ];
 
     if (friendIds.length > 0) {
