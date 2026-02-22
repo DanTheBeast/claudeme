@@ -416,6 +416,16 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Privacy Policy */}
+        <a
+          href="https://justcallme.app/privacy.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
+        >
+          <Shield className="w-[18px] h-[18px]" /> Privacy Policy
+        </a>
+
         {/* Report a Bug */}
         <a
           href="mailto:hello@justcallme.app?subject=CallMe%20Bug%20Report&body=Describe%20the%20bug%20here..."
