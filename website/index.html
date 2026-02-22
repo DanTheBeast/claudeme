@@ -307,6 +307,29 @@
       border-top: 1px solid var(--gray-300);
     }
 
+    .moment-card--origin {
+      background: linear-gradient(135deg, var(--orange-50) 0%, #fff5f2 100%);
+      border: 1.5px solid var(--orange-100);
+    }
+
+    .moment-card--origin .moment-action {
+      border-top-color: var(--orange-100);
+    }
+
+    .moment-origin-badge {
+      display: inline-block;
+      background: var(--orange);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 100px;
+      margin-bottom: -4px;
+      align-self: flex-start;
+    }
+
     /* ── Screenshots ── */
     .screenshots-section {
       background: var(--gray-900);
@@ -705,6 +728,12 @@
           <span class="moment-emoji">☕</span>
           <p class="moment-scene">Coffee's brewing. You've got 15 minutes before the day starts.</p>
           <p class="moment-action">Your friend across the country is also up early. Timing is everything.</p>
+        </div>
+        <div class="moment-card moment-card--origin">
+          <div class="moment-origin-badge">The origin story</div>
+          <span class="moment-emoji">✈️</span>
+          <p class="moment-scene">Waiting at the airport for a flight. Nowhere to be. Fully free to talk.</p>
+          <p class="moment-action">This exact moment is what inspired CallMe — because there was no easy way to let friends know.</p>
         </div>
       </div>
     </div>
