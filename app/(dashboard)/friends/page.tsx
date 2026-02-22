@@ -189,7 +189,7 @@ export default function FriendsPage() {
 
   const inviteFriends = async () => {
     const inviteUrl = `${window.location.origin}/auth`;
-    const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Join me so we can actually talk — no algorithms.\n\n${inviteUrl}`;
+    const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Like you! Join me so we can easily find times to chat.\n\n${inviteUrl}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: "Join me on CallMe", text: inviteText });
