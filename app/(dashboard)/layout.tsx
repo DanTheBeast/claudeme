@@ -15,7 +15,7 @@ import { Toast } from "@/app/_components/toast";
 import type { Profile } from "@/app/_lib/types";
 import AuthPage from "@/app/auth/page";
 import { soundAppLaunch } from "@/app/_lib/haptics";
-import { registerPushNotifications } from "@/app/_lib/push-notifications";
+import { registerPushNotifications, clearNotificationBadge } from "@/app/_lib/push-notifications";
 import { SplashScreen } from "@capacitor/splash-screen";
 
 interface AppContextType {
@@ -109,9 +109,13 @@ export default function DashboardLayout({
     }, 3000);
 
     fetchProfile();
+    clearNotificationBadge();
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") fetchProfile();
+      if (document.visibilityState === "visible") {
+        fetchProfile();
+        clearNotificationBadge();
+      }
     };
     document.addEventListener("visibilitychange", handleVisibility);
 

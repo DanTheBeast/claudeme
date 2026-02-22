@@ -2,6 +2,17 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { Capacitor } from "@capacitor/core";
 
 /**
+ * Clear the app icon badge and dismiss all delivered notifications
+ * from the notification center. Call this when the app comes to foreground.
+ */
+export async function clearNotificationBadge(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await PushNotifications.removeAllDeliveredNotifications();
+  } catch {}
+}
+
+/**
  * Request permission, register for APNs, and return the device token.
  * Saves the token to Supabase push_tokens table.
  */
