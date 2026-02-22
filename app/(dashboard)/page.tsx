@@ -410,6 +410,12 @@ export default function HomePage() {
               setMood(val);
               setMoodDirty(val !== (user.current_mood || ""));
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (moodDirty) saveMood();
+              }
+            }}
             placeholder="A show, game, sports, something on your mind..."
             rows={2}
             maxLength={120}

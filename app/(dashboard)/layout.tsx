@@ -182,30 +182,41 @@ export default function DashboardLayout({
       }
     });
 
-    // Use a ref so the realtime callback always sees the latest user ID
-    // without capturing a stale closure (user is null at effect setup time).
-    const channel = supabase
-      .channel("profile-changes")
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "profiles" },
-        (payload) => {
-          setUser((current) => {
-            if (current && payload.new.id === current.id) {
-              return payload.new as Profile;
-            }
-            return current;
-          });
-        }
-      )
-      .subscribe();
+    // Scope the Realtime subscription to the current user's row only —
+    // without a filter every profile UPDATE on the table fans out to all clients.
+    const getProfileChannel = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return null;
+      return supabase
+        .channel("profile-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "profiles",
+            filter: `id=eq.${uid}`,
+          },
+          (payload) => {
+            setUser((current) => {
+              if (current && payload.new.id === current.id) {
+                return payload.new as Profile;
+              }
+              return current;
+            });
+          }
+        )
+        .subscribe();
+    };
+    const channelPromise = getProfileChannel();
 
     return () => {
       clearTimeout(timeout);
       clearTimeout(pushRetry);
       document.removeEventListener("visibilitychange", handleVisibility);
       subscription.unsubscribe();
-      supabase.removeChannel(channel);
+      channelPromise.then((ch) => { if (ch) supabase.removeChannel(ch); });
     };
   }, []);
 

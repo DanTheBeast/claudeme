@@ -124,6 +124,8 @@ export default function ProfilePage() {
     await refreshUser();
   };
 
+  const [confirmLogout, setConfirmLogout] = useState(false);
+
   const handleLogout = async () => {
     // signOut triggers onAuthStateChange in the layout which sets authed=false,
     // rendering <AuthPage /> directly — no need for an additional router.push
@@ -430,13 +432,30 @@ export default function ProfilePage() {
           <Lightbulb className="w-[18px] h-[18px]" /> Feature Request
         </a>
 
-        {/* Sign Out */}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-red-200 rounded-[16px] text-red-500 font-medium text-sm hover:bg-red-50 transition-colors"
-        >
-          <LogOut className="w-[18px] h-[18px]" /> Sign Out
-        </button>
+        {/* Sign Out — two-step to prevent accidental taps */}
+        {confirmLogout ? (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirmLogout(false)}
+              className="flex-1 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex-1 px-5 py-3.5 bg-red-500 border-[1.5px] border-red-500 rounded-[16px] text-white font-semibold text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+            >
+              <LogOut className="w-[18px] h-[18px]" /> Yes, sign out
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmLogout(true)}
+            className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-red-200 rounded-[16px] text-red-500 font-medium text-sm hover:bg-red-50 transition-colors"
+          >
+            <LogOut className="w-[18px] h-[18px]" /> Sign Out
+          </button>
+        )}
 
         {/* App info */}
         <div className="bg-white rounded-[22px] p-6 shadow-sm border border-gray-100 text-center">
