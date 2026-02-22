@@ -382,7 +382,7 @@ export default function ProfilePage() {
 
         {/* Report a Bug */}
         <a
-          href="mailto:dan@justcallme.app?subject=CallMe%20Bug%20Report&body=Describe%20the%20bug%20here..."
+          href="mailto:hello@justcallme.app?subject=CallMe%20Bug%20Report&body=Describe%20the%20bug%20here..."
           className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
         >
           <Bug className="w-[18px] h-[18px]" /> Report a Bug
