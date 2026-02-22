@@ -54,13 +54,28 @@ export async function registerPushNotifications(
     console.error("[CallMe] push registration error:", err.error);
   });
 
-  // Handle notification tap — deep link into the app
+  // Handle notification tap — deep link into the app.
+  // Only allow navigation to known internal paths to prevent open redirect.
+  const ALLOWED_PATHS = ["/", "/friends", "/schedule", "/profile"];
   PushNotifications.addListener(
     "pushNotificationActionPerformed",
     (action) => {
       const deepLink = action.notification.data?.deepLink as string | undefined;
-      if (deepLink && typeof window !== "undefined") {
-        window.location.href = deepLink;
+      if (!deepLink || typeof window === "undefined") return;
+      try {
+        const url = new URL(deepLink, window.location.href);
+        // Must be same origin (capacitor://localhost or https://justcallme.app)
+        // and path must be in the allowed list
+        const isSameOrigin = url.origin === window.location.origin ||
+          url.origin === "https://justcallme.app";
+        const isAllowed = ALLOWED_PATHS.some(
+          (p) => url.pathname === p || url.pathname === p + "/"
+        );
+        if (isSameOrigin && isAllowed) {
+          window.location.href = url.pathname;
+        }
+      } catch {
+        // Malformed URL — ignore
       }
     }
   );

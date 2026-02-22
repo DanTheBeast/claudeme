@@ -70,6 +70,7 @@ export default function SchedulePage() {
     end: string;
     desc: string;
   } | null>(null);
+  const [timeError, setTimeError] = useState<string | null>(null);
 
   const loadWindows = async () => {
     if (!user) return;
@@ -441,7 +442,7 @@ export default function SchedulePage() {
       </main>
 
       {/* Add Window — Bottom Sheet */}
-      <BottomSheet open={!!addModal} onClose={() => setAddModal(null)}>
+      <BottomSheet open={!!addModal} onClose={() => { setAddModal(null); setTimeError(null); }}>
         <h3 className="font-display text-xl font-bold mb-5 flex items-center gap-2">
           <Clock className="w-5 h-5" /> Add Availability
         </h3>
@@ -474,9 +475,10 @@ export default function SchedulePage() {
                   type="time"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
                   value={addModal.start}
-                  onChange={(e) =>
-                    setAddModal({ ...addModal, start: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setAddModal({ ...addModal, start: e.target.value });
+                    setTimeError(null);
+                  }}
                 />
               </div>
               <div>
@@ -487,12 +489,16 @@ export default function SchedulePage() {
                   type="time"
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
                   value={addModal.end}
-                  onChange={(e) =>
-                    setAddModal({ ...addModal, end: e.target.value })
-                  }
+                  onChange={(e) => {
+                    setAddModal({ ...addModal, end: e.target.value });
+                    setTimeError(null);
+                  }}
                 />
               </div>
             </div>
+            {timeError && (
+              <p className="text-sm text-red-500 font-medium -mt-1">{timeError}</p>
+            )}
             <div>
               <label className="text-[13px] font-semibold mb-1.5 block">
                 Note (optional)
@@ -526,8 +532,11 @@ export default function SchedulePage() {
               <button
                 onClick={() => {
                   if (addModal.start >= addModal.end) {
+                    setTimeError("End time must be after start time");
+                    feedbackError();
                     return;
                   }
+                  setTimeError(null);
                   addWindow(addModal);
                 }}
                 className="callme-gradient text-white px-5 py-2.5 rounded-[14px] text-sm font-semibold hover:shadow-md hover:shadow-callme/25 transition-all"

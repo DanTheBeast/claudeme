@@ -34,6 +34,7 @@ export default function FriendsPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
@@ -285,12 +286,12 @@ export default function FriendsPage() {
             </div>
             <div className="flex flex-col gap-2.5">
               {available.map((f) => (
-                <FriendCard
+                  <FriendCard
                   key={f.id}
                   friend={f.friend}
                   showCallLabel
                   isMuted={false}
-                  onPress={() => setSelectedFriend(f)}
+                  onPress={() => { setConfirmRemove(false); setSelectedFriend(f); }}
                 />
               ))}
             </div>
@@ -306,11 +307,11 @@ export default function FriendsPage() {
             </div>
             <div className="flex flex-col gap-2.5">
               {offline.map((f) => (
-                <FriendCard
+                  <FriendCard
                   key={f.id}
                   friend={f.friend}
                   isMuted={false}
-                  onPress={() => setSelectedFriend(f)}
+                  onPress={() => { setConfirmRemove(false); setSelectedFriend(f); }}
                 />
               ))}
             </div>
@@ -330,7 +331,7 @@ export default function FriendsPage() {
                   key={f.id}
                   friend={f.friend}
                   isMuted
-                  onPress={() => setSelectedFriend(f)}
+                  onPress={() => { setConfirmRemove(false); setSelectedFriend(f); }}
                 />
               ))}
             </div>
@@ -366,7 +367,7 @@ export default function FriendsPage() {
       </main>
 
       {/* Friend Detail Sheet */}
-      <BottomSheet open={!!selectedFriend} onClose={() => setSelectedFriend(null)}>
+      <BottomSheet open={!!selectedFriend} onClose={() => { setSelectedFriend(null); setConfirmRemove(false); }}>
         {selectedFriend && (
           <>
             {/* Profile summary */}
@@ -420,17 +421,37 @@ export default function FriendsPage() {
                 )}
               </button>
 
-              {/* Remove */}
-              <button
-                onClick={() => removeFriend(
-                  selectedFriend.id,
-                  selectedFriend.friend.display_name.split(" ")[0]
-                )}
-                className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border border-red-200 rounded-[16px] text-red-500 font-medium text-sm hover:bg-red-50 transition-colors"
-              >
-                <UserMinus className="w-[18px] h-[18px]" />
-                Remove {selectedFriend.friend.display_name.split(" ")[0]}
-              </button>
+              {/* Remove — two-step confirm */}
+              {confirmRemove ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmRemove(false)}
+                    className="flex-1 px-5 py-3.5 bg-white border border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmRemove(false);
+                      removeFriend(
+                        selectedFriend.id,
+                        selectedFriend.friend.display_name.split(" ")[0]
+                      );
+                    }}
+                    className="flex-1 px-5 py-3.5 bg-red-500 border border-red-500 rounded-[16px] text-white font-semibold text-sm hover:bg-red-600 transition-colors"
+                  >
+                    Yes, remove
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmRemove(true)}
+                  className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border border-red-200 rounded-[16px] text-red-500 font-medium text-sm hover:bg-red-50 transition-colors"
+                >
+                  <UserMinus className="w-[18px] h-[18px]" />
+                  Remove {selectedFriend.friend.display_name.split(" ")[0]}
+                </button>
+              )}
             </div>
           </>
         )}

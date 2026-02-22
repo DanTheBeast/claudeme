@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackError, soundsEnabled, setSoundsEnabled } from "@/app/_lib/haptics";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
@@ -38,6 +38,18 @@ export default function ProfilePage() {
     current_mood: user?.current_mood || "",
     username: user?.username || "",
   });
+
+  // Re-sync draft if user loads after mount (e.g. slow cold start)
+  useEffect(() => {
+    if (user && !editing) {
+      setDraft({
+        display_name: user.display_name || "",
+        phone_number: user.phone_number || "",
+        current_mood: user.current_mood || "",
+        username: user.username || "",
+      });
+    }
+  }, [user?.id]);
 
   const save = async () => {
     if (!user) return;
