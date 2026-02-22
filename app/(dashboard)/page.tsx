@@ -374,7 +374,7 @@ export default function HomePage() {
         <div className="rounded-[18px] bg-gradient-to-br from-[#FDFBF9] to-callme-50 border border-gray-100 p-4 anim-fade-up-2">
           <div className="flex items-center gap-2 mb-2.5">
             <Lightbulb className="w-4 h-4 text-callme" />
-            <span className="font-semibold text-[14px]">Your status</span>
+            <span className="font-semibold text-[14px]">What's on your mind?</span>
           </div>
           <textarea
             value={mood}
@@ -383,7 +383,7 @@ export default function HomePage() {
               setMood(val);
               setMoodDirty(val !== (user.current_mood || ""));
             }}
-            placeholder="What do you feel like chatting about?"
+            placeholder="A show, game, sports, something on your mind..."
             rows={2}
             maxLength={120}
             className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/15 focus:border-callme bg-white resize-none"

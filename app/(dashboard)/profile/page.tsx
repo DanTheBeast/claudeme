@@ -280,7 +280,7 @@ export default function ProfilePage() {
             {/* Status */}
             <div>
               <label className="text-[13px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
-                <MessageCircle className="w-3.5 h-3.5" /> Status
+                <MessageCircle className="w-3.5 h-3.5" /> What's on your mind?
               </label>
               {editing ? (
                 <textarea
@@ -290,11 +290,14 @@ export default function ProfilePage() {
                   onChange={(e) =>
                     setDraft({ ...draft, current_mood: e.target.value })
                   }
-                  placeholder="What do you want to chat about?"
+                  placeholder="A show, game, sports, something on your mind..."
                 />
               ) : (
-                <div className="bg-[#f8f6f3] p-3.5 rounded-[14px] text-sm text-gray-600 min-h-[44px]">
-                  {user.current_mood || "No status set"}
+                <div className="bg-[#f8f6f3] p-3.5 rounded-[14px] text-sm min-h-[44px]">
+                  {user.current_mood
+                    ? <span className="text-gray-600 italic">{user.current_mood}</span>
+                    : <span className="text-gray-400">Nothing yet — give friends a reason to call</span>
+                  }
                 </div>
               )}
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar } from "./avatar";
-import { Phone, MessageCircle, BellOff } from "lucide-react";
+import { Phone, Sparkles, BellOff } from "lucide-react";
 import type { Profile } from "@/app/_lib/types";
 import { hapticMedium, hapticLight } from "@/app/_lib/haptics";
 
@@ -68,8 +68,8 @@ export function FriendCard({
 
           {!isMuted && friend.current_mood && (
             <div className="flex items-center gap-1 mt-1">
-              <MessageCircle className="w-3 h-3 text-blue-500 flex-shrink-0" />
-              <span className="text-[12px] text-gray-500 truncate">
+              <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
+              <span className="text-[12px] text-gray-500 truncate italic">
                 {friend.current_mood}
               </span>
             </div>
