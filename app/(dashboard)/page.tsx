@@ -279,7 +279,14 @@ export default function HomePage() {
             <span className="font-display text-xl font-bold">CallMe</span>
           </div>
           <span className="text-sm text-gray-400">
-            Hey {user.display_name?.split(" ")[0]}! 👋
+            {(() => {
+              const h = new Date().getHours();
+              const name = user.display_name?.split(" ")[0];
+              if (h < 12) return `Good morning, ${name}! ☀️`;
+              if (h < 17) return `Good afternoon, ${name}! 👋`;
+              if (h < 21) return `Good evening, ${name}! 🌆`;
+              return `Good night, ${name}! 🌙`;
+            })()}
           </span>
         </div>
       </header>
