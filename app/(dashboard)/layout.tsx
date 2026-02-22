@@ -44,6 +44,7 @@ export default function DashboardLayout({
   const supabase = useMemo(() => createClient(), []);
   const launchJinglePlayed = useRef(false);
   const initialLoadDone = useRef(false);
+  const pushRegistered = useRef(false);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -70,10 +71,13 @@ export default function DashboardLayout({
         launchJinglePlayed.current = true;
         setTimeout(() => soundAppLaunch(), 400);
       }
-      // Register for push on every launch (token may change)
-      registerPushNotifications(session.user.id, supabase).catch((e) => {
-        console.error("[CallMe] push registration failed:", e);
-      });
+      // Register for push once per app session
+      if (!pushRegistered.current) {
+        pushRegistered.current = true;
+        registerPushNotifications(session.user.id, supabase).catch((e) => {
+          console.error("[CallMe] push registration failed:", e);
+        });
+      }
     } catch (e) {
       setAuthed(false);
     }
@@ -92,11 +96,12 @@ export default function DashboardLayout({
       }
     }, 5000);
 
-    // Register push after a short delay as a fallback in case
-    // fetchProfile completes before the supabase client is ready
+    // Fallback push registration if fetchProfile didn't trigger it
     const pushRetry = setTimeout(async () => {
+      if (pushRegistered.current) return;
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        pushRegistered.current = true;
         registerPushNotifications(session.user.id, supabase).catch((e) => {
           console.error("[CallMe] push retry failed:", e);
         });
@@ -123,9 +128,12 @@ export default function DashboardLayout({
           .single();
         if (data) setUser(data as Profile);
         setAuthed(true);
-        registerPushNotifications(session.user.id, supabase).catch((e) => {
-          console.error("[CallMe] push registration failed:", e);
-        });
+        if (!pushRegistered.current) {
+          pushRegistered.current = true;
+          registerPushNotifications(session.user.id, supabase).catch((e) => {
+            console.error("[CallMe] push registration failed:", e);
+          });
+        }
       } else {
         setUser(null);
         setAuthed(false);
