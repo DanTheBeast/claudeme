@@ -87,14 +87,14 @@ export default function DashboardLayout({
   }, [supabase]);
 
   useEffect(() => {
-    // Safety net: never stay stuck on loading screen beyond 5s
+    // Safety net: never stay stuck on loading screen beyond 15s
     const timeout = setTimeout(() => {
       if (!initialLoadDone.current) {
         setLoading(false);
         initialLoadDone.current = true;
         try { SplashScreen.hide(); } catch {}
       }
-    }, 5000);
+    }, 15000);
 
     // Fallback push registration if fetchProfile didn't trigger it
     const pushRetry = setTimeout(async () => {
