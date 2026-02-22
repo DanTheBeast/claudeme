@@ -56,6 +56,7 @@ export default function DashboardLayout({
         setAuthed(false);
         setLoading(false);
         initialLoadDone.current = true;
+        try { await SplashScreen.hide(); } catch {}
         return;
       }
 
@@ -67,23 +68,32 @@ export default function DashboardLayout({
 
       if (data) setUser(data as Profile);
       setAuthed(true);
+
+      // Hide splash and play jingle as soon as profile is loaded —
+      // defer everything else (push, realtime) so UI renders first
+      setLoading(false);
+      initialLoadDone.current = true;
+      try { await SplashScreen.hide(); } catch {}
+
       if (!launchJinglePlayed.current) {
         launchJinglePlayed.current = true;
-        setTimeout(() => soundAppLaunch(), 400);
+        setTimeout(() => soundAppLaunch(), 300);
       }
-      // Register for push once per app session
-      if (!pushRegistered.current) {
-        pushRegistered.current = true;
-        registerPushNotifications(session.user.id, supabase).catch((e) => {
-          console.error("[CallMe] push registration failed:", e);
-        });
-      }
+
+      // Defer push registration until after UI is interactive
+      setTimeout(() => {
+        if (!pushRegistered.current) {
+          pushRegistered.current = true;
+          registerPushNotifications(session.user.id, supabase).catch(() => {});
+        }
+      }, 1000);
+
     } catch (e) {
       setAuthed(false);
+      setLoading(false);
+      initialLoadDone.current = true;
+      try { await SplashScreen.hide(); } catch {}
     }
-    setLoading(false);
-    initialLoadDone.current = true;
-    try { await SplashScreen.hide(); } catch {}
   }, [supabase]);
 
   useEffect(() => {

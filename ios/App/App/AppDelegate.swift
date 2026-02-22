@@ -1,13 +1,23 @@
 import UIKit
 import Capacitor
+import WebKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
 
+    // Pre-warm WKWebView so the JS engine is ready before Capacitor needs it.
+    // This runs in parallel with the splash screen, cutting cold-start time significantly.
+    private var warmupWebView: WKWebView?
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Instantiate a tiny offscreen WKWebView immediately at launch.
+        // This forces iOS to spin up the WebContent, Networking, and GPU processes
+        // right away instead of waiting until Capacitor's own WebView is created.
+        let config = WKWebViewConfiguration()
+        warmupWebView = WKWebView(frame: .zero, configuration: config)
+        warmupWebView?.loadHTMLString("<html></html>", baseURL: nil)
         return true
     }
 
