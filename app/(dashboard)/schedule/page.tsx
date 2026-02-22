@@ -30,6 +30,54 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
+/**
+ * Convert a "HH:MM" time string from a source timezone into the viewer's
+ * local timezone, returning a new "HH:MM" string.
+ *
+ * Strategy: anchor to a fixed reference date (a Monday, day 0 of our week
+ * logic doesn't matter here — we only care about the clock time offset).
+ * Build a Date in the source tz, then read back the hours/minutes in local tz.
+ */
+function convertTimeToLocal(time: string, sourceTz: string): string {
+  if (!sourceTz || sourceTz === "UTC") {
+    // If no timezone info, fall back to treating the time as local (old behavior)
+    return time;
+  }
+  try {
+    const [h, m] = time.split(":").map(Number);
+    // Use a fixed reference date — timezone offsets are day-independent for our purposes
+    const refDate = "2024-01-15"; // A Monday
+    // Build an ISO string representing this time in the source timezone
+    // by finding what UTC time corresponds to h:mm in sourceTz
+    const sourceStr = `${refDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+    // Parse as if it's in sourceTz using a trick: format a known UTC time
+    // and find the offset. We use the Intl API to get the UTC equivalent.
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: sourceTz,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date(`${refDate}T12:00:00Z`));
+
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value ?? "0";
+    // Offset = local wall clock - UTC. We know UTC is 12:00, read back local.
+    const tzHour = parseInt(getPart("hour"));
+    const tzMin  = parseInt(getPart("minute"));
+    const offsetMinutes = (tzHour === 24 ? 0 : tzHour) * 60 + tzMin - 12 * 60;
+
+    // Apply offset to get UTC minutes, then apply local offset to get local time
+    const localOffset = -new Date().getTimezoneOffset(); // in minutes, positive = ahead of UTC
+    const totalMins = h * 60 + m - offsetMinutes + localOffset;
+    // Wrap to [0, 1440)
+    const wrapped = ((totalMins % 1440) + 1440) % 1440;
+    const lh = Math.floor(wrapped / 60);
+    const lm = wrapped % 60;
+    return `${String(lh).padStart(2, "0")}:${String(lm).padStart(2, "0")}`;
+  } catch {
+    return time; // fallback: show as-is
+  }
+}
+
 function timesOverlap(
   aStart: string,
   aEnd: string,
@@ -52,6 +100,10 @@ function timesOverlap(
 
 interface FriendWindow extends AvailabilityWindow {
   friend?: Profile;
+  // start_time/end_time are in the friend's timezone.
+  // localStart/localEnd are converted to the current viewer's local timezone.
+  localStart: string;
+  localEnd: string;
 }
 
 export default function SchedulePage() {
@@ -123,10 +175,16 @@ export default function SchedulePage() {
         (profiles || []).map((p: Profile) => [p.id, p])
       );
       setFriendWindows(
-        (fWindows || []).map((w: AvailabilityWindow) => ({
-          ...w,
-          friend: profileMap.get(w.user_id) as Profile | undefined,
-        }))
+        (fWindows || []).map((w: AvailabilityWindow) => {
+          const friend = profileMap.get(w.user_id) as Profile | undefined;
+          const sourceTz = friend?.timezone || "UTC";
+          return {
+            ...w,
+            friend,
+            localStart: convertTimeToLocal(w.start_time, sourceTz),
+            localEnd:   convertTimeToLocal(w.end_time,   sourceTz),
+          };
+        })
       );
     }
 
@@ -198,7 +256,7 @@ export default function SchedulePage() {
 
     return theirWindows.filter((fw) =>
       myWindows.some((mw) =>
-        timesOverlap(mw.start_time, mw.end_time, fw.start_time, fw.end_time, isToday ? nowMinutes : undefined)
+        timesOverlap(mw.start_time, mw.end_time, fw.localStart, fw.localEnd, isToday ? nowMinutes : undefined)
       )
     );
   };
@@ -244,6 +302,11 @@ export default function SchedulePage() {
       <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 56px)" }} />
 
       <main className="px-5 pt-5 flex flex-col gap-3">
+        {/* Timezone note */}
+        <p className="text-[11px] text-gray-400 text-center -mb-1">
+          All times shown in your local timezone
+        </p>
+
         {/* Current time */}
         <div className="bg-white rounded-[18px] p-4 shadow-sm border border-gray-100 anim-fade-up flex items-center gap-2">
           <Clock className="w-4 h-4 text-callme" />
@@ -365,17 +428,17 @@ export default function SchedulePage() {
                     </p>
                     <div className="flex flex-col gap-1.5">
                       {dayFriendWindows.map((fw) => {
-                        const isOverlap =
-                          dayWindows.length > 0 &&
-                          dayWindows.some((mw) =>
-                            timesOverlap(
-                              mw.start_time,
-                              mw.end_time,
-                              fw.start_time,
-                              fw.end_time,
-                              isToday ? nowMinutes : undefined
-                            )
-                          );
+                          const isOverlap =
+                            dayWindows.length > 0 &&
+                            dayWindows.some((mw) =>
+                              timesOverlap(
+                                mw.start_time,
+                                mw.end_time,
+                                fw.localStart,
+                                fw.localEnd,
+                                isToday ? nowMinutes : undefined
+                              )
+                            );
 
                         return (
                           <div
@@ -416,8 +479,8 @@ export default function SchedulePage() {
                                       : "text-gray-400"
                                   }`}
                                 >
-                                  {formatTime12(fw.start_time)} –{" "}
-                                  {formatTime12(fw.end_time)}
+                                  {formatTime12(fw.localStart)} –{" "}
+                                  {formatTime12(fw.localEnd)}
                                   {fw.description && ` · ${fw.description}`}
                                 </span>
                               </div>

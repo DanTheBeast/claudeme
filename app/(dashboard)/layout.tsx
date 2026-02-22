@@ -79,6 +79,16 @@ export default function DashboardLayout({
       if (data) setUser(data as Profile);
       setAuthed(true);
 
+      // Silently sync the user's timezone — update only if it has changed
+      const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (detectedTz && data?.timezone !== detectedTz) {
+        supabase
+          .from("profiles")
+          .update({ timezone: detectedTz })
+          .eq("id", session.user.id)
+          .then(() => {});
+      }
+
       // Fetch pending friend requests count for nav badge
       const { count } = await supabase
         .from("friendships")

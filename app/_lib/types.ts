@@ -23,6 +23,7 @@ export interface Profile {
   quiet_hours_end: string | null;
   enable_quiet_hours: boolean;
   available_until: string | null;
+  timezone: string;
   [key: string]: string | boolean | null;
 }
 
