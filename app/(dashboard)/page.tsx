@@ -150,6 +150,15 @@ export default function HomePage() {
     };
   }, [user?.id]);
 
+  // Keep local mood in sync when the user updates it from the profile page
+  // (context refreshes, but the home page's mood state was already initialized).
+  // Only sync when the textarea isn't actively dirty to avoid overwriting mid-edit.
+  useEffect(() => {
+    if (!moodDirty) {
+      setMood(user?.current_mood || "");
+    }
+  }, [user?.current_mood]);
+
   // Countdown ticker — starts/clears based on effective availableUntil
   useEffect(() => {
     if (countdownRef.current) clearInterval(countdownRef.current);
@@ -439,7 +448,11 @@ export default function HomePage() {
             {offlineOpen && (
               <div className="flex flex-col gap-2.5 pt-1">
                 {offline.map((f) => (
-                  <FriendCard key={f.id} friend={f.friend} />
+                  <FriendCard
+                    key={f.id}
+                    friend={f.friend}
+                    onOfflineCall={() => toast("They're not marked available — giving it a shot!")}
+                  />
                 ))}
               </div>
             )}
@@ -511,13 +524,20 @@ export default function HomePage() {
               onClick={() => goAvailable(d.minutes)}
               className="w-full flex items-center justify-between px-5 py-3.5 bg-white border border-gray-200 rounded-[16px] hover:border-emerald-300 hover:bg-emerald-50 transition-all group"
             >
-              <span className="font-semibold text-sm group-hover:text-emerald-700 transition-colors">
-                {d.label}
-              </span>
+              <div className="text-left">
+                <span className="font-semibold text-sm group-hover:text-emerald-700 transition-colors">
+                  {d.label}
+                </span>
+                {d.minutes === null && (
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    You'll need to turn this off manually
+                  </p>
+                )}
+              </div>
               {d.minutes === null ? (
-                <Infinity className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors" />
+                <Infinity className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
               ) : (
-                <Timer className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors" />
+                <Timer className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
               )}
             </button>
           ))}

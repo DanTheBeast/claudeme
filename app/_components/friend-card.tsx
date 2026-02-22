@@ -19,11 +19,13 @@ export function FriendCard({
   showCallLabel = false,
   isMuted = false,
   onPress,
+  onOfflineCall,
 }: {
   friend: Profile;
   showCallLabel?: boolean;
   isMuted?: boolean;
   onPress?: () => void;
+  onOfflineCall?: () => void;
 }) {
   const phoneClean = friend.phone_number?.replace(/[^\d+]/g, "");
 
@@ -80,8 +82,8 @@ export function FriendCard({
         </div>
       </button>
 
-      {/* Call button — suppressed when muted */}
-      {!isMuted && phoneClean ? (
+      {/* Call button — only shown when not muted and phone number exists */}
+      {!isMuted && phoneClean && (
         friend.is_available ? (
           showCallLabel ? (
             <a
@@ -101,19 +103,14 @@ export function FriendCard({
             </a>
           )
         ) : (
+          // Offline but has a phone — still tappable, just dimmed
           <a
             href={`tel:${phoneClean}`}
-            onClick={() => hapticMedium()}
+            onClick={() => { hapticMedium(); onOfflineCall?.(); }}
             className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0 hover:bg-gray-200 transition-all"
           >
             <Phone className="w-[15px] h-[15px] text-gray-400" />
           </a>
-        )
-      ) : (
-        !isMuted && (
-          <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <Phone className="w-[15px] h-[15px] text-gray-300" />
-          </div>
         )
       )}
     </div>

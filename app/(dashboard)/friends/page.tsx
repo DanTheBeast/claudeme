@@ -128,16 +128,32 @@ export default function FriendsPage() {
     loadData();
   }, [user?.id]);
 
-  // Debounced search
+  // Debounced search — only shows users who allow friend requests,
+  // and filters out people already friended or with a pending request.
   useEffect(() => {
     if (searchQuery.length < 2) { setSearchResults([]); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
+
+      // Build exclusion list: self + existing friends + pending requests (both directions)
+      const existingIds = new Set<string>([user?.id || ""]);
+      friends.forEach((f) => existingIds.add(f.friend.id));
+      pendingRequests.forEach((r) => existingIds.add(r.user_id));
+
+      // Also fetch outgoing pending requests the current user sent
+      const { data: outgoing } = await supabase
+        .from("friendships")
+        .select("friend_id")
+        .eq("user_id", user?.id || "")
+        .eq("status", "pending");
+      (outgoing || []).forEach((r) => existingIds.add(r.friend_id));
+
       const { data } = await supabase
         .from("profiles")
         .select("*")
         .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
-        .neq("id", user?.id || "")
+        .eq("allow_friend_requests", true)
+        .not("id", "in", `(${Array.from(existingIds).join(",")})`)
         .limit(10);
       setSearchResults((data || []) as Profile[]);
       setSearching(false);
@@ -210,7 +226,7 @@ export default function FriendsPage() {
     if (selectedFriend?.id === friendshipId) {
       setSelectedFriend((prev) => prev ? { ...prev, is_muted: !currentlyMuted } : null);
     }
-    toast(currentlyMuted ? `${name} unmuted` : `${name} muted — they won't see your availability`);
+    toast(currentlyMuted ? `${name} unmuted` : `${name} muted — you won't see each other's availability`);
   };
 
   const inviteFriends = async () => {
@@ -322,11 +338,12 @@ export default function FriendsPage() {
             </div>
             <div className="flex flex-col gap-2.5">
               {offline.map((f) => (
-                  <FriendCard
+                <FriendCard
                   key={f.id}
                   friend={f.friend}
                   isMuted={false}
                   onPress={() => { setConfirmRemove(false); setSelectedFriend(f); }}
+                  onOfflineCall={() => toast("They're not marked available — giving it a shot!")}
                 />
               ))}
             </div>
@@ -432,7 +449,7 @@ export default function FriendsPage() {
                 {selectedFriend.is_muted ? (
                   <><Bell className="w-[18px] h-[18px] text-callme" /> Unmute</>
                 ) : (
-                  <><BellOff className="w-[18px] h-[18px]" /> Mute — hide my availability from them</>
+                  <><BellOff className="w-[18px] h-[18px]" /> Mute — hide availability from each other</>
                 )}
               </button>
 
