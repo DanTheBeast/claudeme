@@ -137,7 +137,11 @@ export default function HomePage() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "profiles" },
-        () => loadFriends()
+        (payload) => {
+          // Only reload if a friend's profile changed, not our own
+          // (our own changes are handled by the layout's refreshUser)
+          if (payload.new.id !== user?.id) loadFriends();
+        }
       )
       .subscribe();
 
@@ -375,13 +379,16 @@ export default function HomePage() {
           <textarea
             value={mood}
             onChange={(e) => {
-              setMood(e.target.value);
-              setMoodDirty(e.target.value !== (user.current_mood || ""));
+              const val = e.target.value.slice(0, 120);
+              setMood(val);
+              setMoodDirty(val !== (user.current_mood || ""));
             }}
             placeholder="What do you feel like chatting about?"
             rows={2}
+            maxLength={120}
             className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/15 focus:border-callme bg-white resize-none"
           />
+          <p className="text-[11px] text-gray-300 text-right mt-1">{mood.length}/120</p>
           {moodDirty && (
             <div className="flex justify-end mt-2">
               <button

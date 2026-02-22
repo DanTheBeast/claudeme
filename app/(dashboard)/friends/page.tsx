@@ -35,6 +35,7 @@ export default function FriendsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [sendingRequest, setSendingRequest] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
@@ -136,12 +137,14 @@ export default function FriendsPage() {
   }, [searchQuery]);
 
   const sendFriendRequest = async (recipientId: string) => {
-    if (!user) return;
+    if (!user || sendingRequest) return;
+    setSendingRequest(recipientId);
     const { error } = await supabase.from("friendships").insert({
       user_id: user.id,
       friend_id: recipientId,
       status: "pending",
     });
+    setSendingRequest(null);
     if (error) {
       feedbackError();
       toast("Failed to send request — maybe already sent?");
@@ -506,9 +509,15 @@ export default function FriendsPage() {
                   </div>
                   <button
                     onClick={() => sendFriendRequest(p.id)}
-                    className="callme-gradient text-white px-3.5 py-1.5 rounded-[10px] text-xs font-semibold flex items-center gap-1"
+                    disabled={!!sendingRequest}
+                    className="callme-gradient text-white px-3.5 py-1.5 rounded-[10px] text-xs font-semibold flex items-center gap-1 disabled:opacity-60"
                   >
-                    <UserPlus className="w-3 h-3" /> Add
+                    {sendingRequest === p.id ? (
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <UserPlus className="w-3 h-3" />
+                    )}
+                    {sendingRequest === p.id ? "Sending…" : "Add"}
                   </button>
                 </div>
               ))}

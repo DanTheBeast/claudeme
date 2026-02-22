@@ -50,10 +50,6 @@ export async function registerPushNotifications(
 
   await PushNotifications.register();
 
-  PushNotifications.addListener("registrationError", (err) => {
-    console.error("[CallMe] push registration error:", err.error);
-  });
-
   // Handle notification tap — deep link into the app.
   // Only allow navigation to known internal paths to prevent open redirect.
   const ALLOWED_PATHS = ["/", "/friends", "/schedule", "/profile"];

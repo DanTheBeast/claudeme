@@ -54,6 +54,11 @@ export default function ProfilePage() {
 
   const save = async () => {
     if (!user) return;
+    if (!draft.display_name.trim()) {
+      feedbackError();
+      toast("Name can't be empty");
+      return;
+    }
     const { error } = await supabase
       .from("profiles")
       .update({

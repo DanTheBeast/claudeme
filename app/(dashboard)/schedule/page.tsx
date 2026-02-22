@@ -19,8 +19,10 @@ const DAYS = [
   "Saturday",
 ];
 
-function formatTime12(t: string) {
+function formatTime12(t: string | null | undefined): string {
+  if (!t) return "—";
   const [h, m] = t.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return "—";
   const ampm = h >= 12 ? "PM" : "AM";
   return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${ampm}`;
 }

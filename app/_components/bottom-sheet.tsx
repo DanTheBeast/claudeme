@@ -13,6 +13,8 @@ export function BottomSheet({
   children: React.ReactNode;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef<number | null>(null);
+  const dragCurrentY = useRef<number>(0);
 
   // Play sound when sheet opens
   useEffect(() => {
@@ -34,6 +36,37 @@ export function BottomSheet({
     return () => document.removeEventListener("focusin", handleFocus);
   }, [open]);
 
+  // Swipe-to-dismiss: track touch on the sheet itself
+  const onTouchStart = (e: React.TouchEvent) => {
+    dragStartY.current = e.touches[0].clientY;
+    dragCurrentY.current = 0;
+    if (sheetRef.current) sheetRef.current.style.transition = "none";
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (dragStartY.current === null) return;
+    const dy = e.touches[0].clientY - dragStartY.current;
+    if (dy < 0) return; // don't allow dragging up
+    dragCurrentY.current = dy;
+    if (sheetRef.current) {
+      sheetRef.current.style.transform = `translateY(${dy}px)`;
+    }
+  };
+
+  const onTouchEnd = () => {
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = "";
+      sheetRef.current.style.transform = "";
+    }
+    // Dismiss if dragged more than 120px down
+    if (dragCurrentY.current > 120) {
+      feedbackClick();
+      onClose();
+    }
+    dragStartY.current = null;
+    dragCurrentY.current = 0;
+  };
+
   if (!open) return null;
 
   return (
@@ -52,6 +85,9 @@ export function BottomSheet({
           maxWidth: "100vw",
         }}
         onClick={(e) => e.stopPropagation()}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
       >
         {/* Drag handle */}
         <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mt-2 mb-5" />
