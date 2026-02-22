@@ -28,6 +28,7 @@ export default function ProfilePage() {
 
   const [editing, setEditing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [avatarBust, setAvatarBust] = useState<string | null>(null);
   const [appSounds, setAppSounds] = useState(() => soundsEnabled());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState({
@@ -90,12 +91,17 @@ export default function ProfilePage() {
       const { data: urlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(path);
-      const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
+      // Store the clean URL without cache-busting params — the timestamp query
+      // param is appended at render time by the Avatar component to bust CDN cache.
+      const publicUrl = urlData.publicUrl;
       await supabase
         .from("profiles")
         .update({ profile_picture: publicUrl })
         .eq("id", user.id);
       await refreshUser();
+      // Bust the browser/CDN cache for this session so the new photo shows immediately.
+      // We do NOT store this timestamp in the DB — just use it locally for rendering.
+      setAvatarBust(String(Date.now()));
       toast("Photo updated!");
     } catch {
       toast("Failed to upload photo");
@@ -222,7 +228,9 @@ export default function ProfilePage() {
                 name={user.display_name}
                 id={user.id}
                 size="lg"
-                src={user.profile_picture}
+                src={user.profile_picture
+                  ? user.profile_picture + (avatarBust ? `?t=${avatarBust}` : "")
+                  : null}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -434,7 +442,7 @@ export default function ProfilePage() {
         <div className="bg-white rounded-[22px] p-6 shadow-sm border border-gray-100 text-center">
           <img src="/logo.png" alt="CallMe" className="w-12 h-12 rounded-[14px] mx-auto mb-3" />
           <h3 className="font-display font-bold">CallMe</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Version 1.0.0</p>
+          <p className="text-xs text-gray-400 mt-0.5">Version {process.env.NEXT_PUBLIC_APP_VERSION || "1.0.0"}</p>
           <p className="text-xs text-gray-300 mt-1">
             Connect through real conversations
           </p>

@@ -331,6 +331,22 @@ export default function SchedulePage() {
           <div className="text-center py-12 text-gray-400 text-sm">
             Loading schedule...
           </div>
+        ) : windows.length === 0 ? (
+          <div className="bg-white rounded-[22px] p-8 shadow-sm border border-gray-100 text-center anim-fade-up">
+            <div className="w-14 h-14 rounded-full bg-callme-50 flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-6 h-6 text-callme" />
+            </div>
+            <h3 className="font-display text-lg font-bold mb-1.5">No availability set</h3>
+            <p className="text-gray-400 text-sm leading-relaxed mb-5 max-w-[260px] mx-auto">
+              Add your weekly free windows so CallMe can find the best times for you and your friends to connect.
+            </p>
+            <button
+              onClick={() => setAddModal({ day: today, start: "09:00", end: "10:00", desc: "" })}
+              className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
+            >
+              <Plus className="w-4 h-4" /> Add your first window
+            </button>
+          </div>
         ) : (
           // Show days starting from today, wrapping around the week
           Array.from({ length: 7 }, (_, i) => (today + i) % 7).map((dayIdx) => {

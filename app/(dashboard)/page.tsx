@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Timer,
   Infinity,
+  ArrowRight,
 } from "lucide-react";
 import Link from "next/link";
 import type { FriendWithProfile, Profile } from "@/app/_lib/types";
@@ -354,6 +355,23 @@ export default function HomePage() {
             }`}
           />
         </div>
+
+        {/* ── Phone number nudge — shown until user adds one ── */}
+        {!user.phone_number && (
+          <Link
+            href="/profile"
+            className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-[18px] p-4 anim-fade-up hover:bg-amber-100 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Phone className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-amber-900">Add your phone number</p>
+              <p className="text-xs text-amber-700 mt-0.5">So friends can actually call you when you're free</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          </Link>
+        )}
 
         {/* ── Available friends — the whole point of the app ── */}
         {!loadingFriends && available.length > 0 && (

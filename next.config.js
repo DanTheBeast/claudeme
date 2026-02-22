@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
+const { version } = require("./package.json");
+
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+  },
   // Static export for Capacitor native app builds.
   // When deploying to Vercel/web, remove or comment out `output: 'export'`.
   output: "export",

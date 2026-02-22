@@ -31,6 +31,9 @@ export default function FriendsPage() {
   const [pendingRequests, setPendingRequests] = useState<
     (Friendship & { requester?: Profile })[]
   >([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<
+    (Friendship & { recipient?: Profile })[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -121,6 +124,30 @@ export default function FriendsPage() {
       setPendingRequests([]);
     }
 
+    // Pending outgoing requests sent by current user
+    const { data: outgoing } = await supabase
+      .from("friendships")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "pending");
+
+    if (outgoing && outgoing.length > 0) {
+      const recipientIds = outgoing.map((r) => r.friend_id);
+      const { data: recipientProfiles } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", recipientIds);
+      setOutgoingRequests(
+        outgoing.map((r) => ({
+          ...r,
+          is_muted: r.is_muted ?? false,
+          recipient: (recipientProfiles || []).find((p) => p.id === r.friend_id) as Profile | undefined,
+        }))
+      );
+    } else {
+      setOutgoingRequests([]);
+    }
+
     setLoading(false);
   };
 
@@ -148,14 +175,31 @@ export default function FriendsPage() {
         .eq("status", "pending");
       (outgoing || []).forEach((r) => existingIds.add(r.friend_id));
 
+      // Search by name/username always; email only if allow_phone_search is true.
+      // Both gated by allow_friend_requests so private users are never surfaced.
       const { data } = await supabase
         .from("profiles")
         .select("*")
-        .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+        .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
         .eq("allow_friend_requests", true)
         .not("id", "in", `(${Array.from(existingIds).join(",")})`)
         .limit(10);
-      setSearchResults((data || []) as Profile[]);
+
+      // Also search by email for users who allow it, then merge + deduplicate
+      const { data: emailResults } = await supabase
+        .from("profiles")
+        .select("*")
+        .ilike("email", `%${searchQuery}%`)
+        .eq("allow_friend_requests", true)
+        .eq("allow_phone_search", true)
+        .not("id", "in", `(${Array.from(existingIds).join(",")})`)
+        .limit(10);
+
+      const merged = [...(data || [])];
+      for (const p of (emailResults || [])) {
+        if (!merged.find((r) => r.id === p.id)) merged.push(p);
+      }
+      setSearchResults(merged.slice(0, 10) as Profile[]);
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
@@ -189,6 +233,14 @@ export default function FriendsPage() {
     toast("Friend request accepted! 🤝");
     loadData();
     refreshUser(); // refreshes pending badge count
+  };
+
+  const cancelRequest = async (requestId: number) => {
+    feedbackClick();
+    const { error } = await supabase.from("friendships").delete().eq("id", requestId);
+    if (error) { feedbackError(); toast("Failed to cancel request"); return; }
+    toast("Request cancelled");
+    loadData();
   };
 
   const declineRequest = async (requestId: number) => {
@@ -308,6 +360,37 @@ export default function FriendsPage() {
           </div>
         )}
 
+        {/* Outgoing pending requests */}
+        {outgoingRequests.length > 0 && (
+          <div className="bg-white rounded-[22px] p-5 shadow-sm border border-gray-200 anim-fade-up">
+            <div className="flex items-center gap-2 mb-4">
+              <UserPlus className="w-5 h-5 text-gray-400" />
+              <h3 className="font-semibold text-[15px] text-gray-600">
+                Sent Requests ({outgoingRequests.length})
+              </h3>
+            </div>
+            <div className="flex flex-col gap-3">
+              {outgoingRequests.map((req) => (
+                <div key={req.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-[14px]">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={req.recipient?.display_name || "User"} id={req.friend_id} />
+                    <div>
+                      <p className="font-medium text-sm">{req.recipient?.display_name || "Unknown"}</p>
+                      <p className="text-xs text-gray-400">@{req.recipient?.username || "user"}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => cancelRequest(req.id)}
+                    className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-[10px] hover:bg-gray-50 hover:text-red-500 hover:border-red-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Available */}
         {available.length > 0 && (
           <div className="anim-fade-up">
@@ -371,7 +454,7 @@ export default function FriendsPage() {
         )}
 
         {/* Empty state */}
-        {!loading && friends.length === 0 && pendingRequests.length === 0 && (
+        {!loading && friends.length === 0 && pendingRequests.length === 0 && outgoingRequests.length === 0 && (
           <div className="bg-white rounded-[22px] p-10 shadow-sm border border-gray-100 text-center anim-fade-up">
             <div className="w-[120px] h-[120px] rounded-full bg-gradient-to-br from-callme-50 to-orange-50 flex items-center justify-center mx-auto mb-5">
               <Users className="w-12 h-12 text-callme/40" />
