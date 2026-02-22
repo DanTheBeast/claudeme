@@ -255,7 +255,7 @@ export default function AuthPage() {
                         type="text"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="Dan Fields"
+                        placeholder="Your name"
                         required
                         className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all bg-gray-50/50 focus:bg-white"
                       />
@@ -388,7 +388,7 @@ export default function AuthPage() {
         </div>
       </div>
       <footer className="text-center py-4 text-xs text-gray-400">
-        Copyright Dan Fields 2026. All Rights Reserved.
+        &copy; 2026 CallMe
       </footer>
     </div>
   );

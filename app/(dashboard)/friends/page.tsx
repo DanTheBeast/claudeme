@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
 import { feedbackFriendAdded, feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
@@ -33,12 +33,21 @@ export default function FriendsPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [sendingRequest, setSendingRequest] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // Delay focus until after the bottom sheet slide-up animation (~300ms)
+  // to prevent iOS keyboard jumping mid-animation.
+  useEffect(() => {
+    if (!showAdd) return;
+    const t = setTimeout(() => searchInputRef.current?.focus(), 350);
+    return () => clearTimeout(t);
+  }, [showAdd]);
 
   const loadData = async () => {
     if (!user) return;
@@ -472,11 +481,11 @@ export default function FriendsPage() {
         <div className="relative mb-4">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
+            ref={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name, username, or email..."
-            autoFocus
             className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme bg-gray-50/50"
           />
         </div>

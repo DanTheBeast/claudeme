@@ -125,6 +125,7 @@ export default function SchedulePage() {
     desc: string;
   } | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
 
   const loadWindows = async () => {
     if (!user) return;
@@ -410,13 +411,30 @@ export default function SchedulePage() {
                             </span>
                           )}
                         </div>
-                        <button
-                          onClick={() => removeWindow(w.id)}
-                          className="text-red-400 hover:text-red-600 p-3 -m-1 transition-colors"
-                          aria-label="Remove window"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        {confirmRemoveId === w.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => setConfirmRemoveId(null)}
+                              className="text-xs text-gray-400 px-2 py-1 rounded-[8px] hover:bg-gray-100 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => { setConfirmRemoveId(null); removeWindow(w.id); }}
+                              className="text-xs text-white bg-red-500 px-2.5 py-1 rounded-[8px] font-semibold hover:bg-red-600 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { feedbackClick(); setConfirmRemoveId(w.id); }}
+                            className="text-red-400 hover:text-red-600 p-3 -m-1 transition-colors"
+                            aria-label="Remove window"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>

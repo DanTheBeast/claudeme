@@ -230,9 +230,6 @@ export default function DashboardLayout({
     <AppContext.Provider value={{ user, refreshUser: fetchProfile, toast, pendingRequests }}>
       <div className="max-w-md mx-auto min-h-screen flex flex-col">
         <div className="flex-1">{children}</div>
-        <footer className="text-center py-4 text-xs text-gray-500 pb-20">
-          Copyright Dan Fields 2026. All Rights Reserved.
-        </footer>
       </div>
       <BottomNav pendingRequests={pendingRequests} />
       {toastMsg && (

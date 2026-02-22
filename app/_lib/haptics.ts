@@ -52,6 +52,8 @@ function playTone(
   if (!soundsEnabled()) return;
   const ac = getCtx();
   if (!ac) return;
+  // iOS WebView suspends AudioContext until a user gesture; resume if needed.
+  if (ac.state === "suspended") { ac.resume().catch(() => {}); }
   const osc = ac.createOscillator();
   const gain = ac.createGain();
   osc.connect(gain);
@@ -98,6 +100,7 @@ export function soundSheetOpen() {
   if (!soundsEnabled()) return;
   const ac = getCtx();
   if (!ac) return;
+  if (ac.state === "suspended") { ac.resume().catch(() => {}); }
   const osc = ac.createOscillator();
   const gain = ac.createGain();
   osc.connect(gain);
@@ -123,6 +126,7 @@ export function soundAppLaunch() {
   if (!soundsEnabled()) return;
   const ac = getCtx();
   if (!ac) return;
+  if (ac.state === "suspended") { ac.resume().catch(() => {}); }
 
   // Notes: E4 → G4 → B4 → E5 (a warm, friendly E major arpeggio)
   const notes = [329.63, 392.00, 493.88, 659.25];

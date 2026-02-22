@@ -22,12 +22,9 @@ import {
   Lightbulb,
   Volume2,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-
 export default function ProfilePage() {
   const { user, refreshUser, toast } = useApp();
   const supabase = createClient();
-  const router = useRouter();
 
   const [editing, setEditing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -122,8 +119,10 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
+    // signOut triggers onAuthStateChange in the layout which sets authed=false,
+    // rendering <AuthPage /> directly — no need for an additional router.push
+    // (which would cause a double-navigation flicker).
     await supabase.auth.signOut();
-    router.push("/auth");
   };
 
   if (!user) return null;

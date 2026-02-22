@@ -21,7 +21,11 @@ export function Toast({
 
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-[999] bg-gray-900 text-white px-6 py-3.5 rounded-2xl text-sm font-medium shadow-2xl anim-fade-up max-w-[90%] text-center"
+      role="button"
+      tabIndex={0}
+      onClick={() => onDoneRef.current()}
+      onKeyDown={(e) => e.key === "Enter" && onDoneRef.current()}
+      className="fixed left-1/2 -translate-x-1/2 z-[999] bg-gray-900 text-white px-6 py-3.5 rounded-2xl text-sm font-medium shadow-2xl anim-fade-up max-w-[90%] text-center cursor-pointer select-none"
       style={{ top: "calc(env(safe-area-inset-top) + 1.25rem)" }}
     >
       {message}
