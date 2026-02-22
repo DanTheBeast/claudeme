@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "./layout";
-import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick } from "@/app/_lib/haptics";
+import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick, feedbackError } from "@/app/_lib/haptics";
 import { FriendCard } from "@/app/_components/friend-card";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
 import {
@@ -67,17 +67,24 @@ export default function HomePage() {
     if (!user) return;
 
     async function loadFriends() {
-      const { data: sentData } = await supabase
+      const { data: sentData, error: sentErr } = await supabase
         .from("friendships")
         .select("id, status, friend_id")
         .eq("user_id", user!.id)
         .eq("status", "accepted");
 
-      const { data: receivedData } = await supabase
+      const { data: receivedData, error: receivedErr } = await supabase
         .from("friendships")
         .select("id, status, user_id")
         .eq("friend_id", user!.id)
         .eq("status", "accepted");
+
+      if (sentErr || receivedErr) {
+        friendsLoadedOnce.current = true;
+        setLoadingFriends(false);
+        toast("Couldn't load friends — check your connection");
+        return;
+      }
 
       const friendIds = [
         ...(sentData || []).map((f) => f.friend_id),
@@ -91,10 +98,17 @@ export default function HomePage() {
         return;
       }
 
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
         .select("*")
         .in("id", friendIds);
+
+      if (profilesErr) {
+        friendsLoadedOnce.current = true;
+        setLoadingFriends(false);
+        toast("Couldn't load friends — check your connection");
+        return;
+      }
 
       const allFriendships = [...(sentData || []), ...(receivedData || [])];
       const result: FriendWithProfile[] = (profiles || []).map((p) => {
@@ -176,10 +190,18 @@ export default function HomePage() {
     setLocalAvailable(true);
     setLocalAvailableUntil(available_until);
     setShowDurationPicker(false);
-    await supabase
+    const { error } = await supabase
       .from("profiles")
       .update({ is_available: true, available_until, last_seen: new Date().toISOString() })
       .eq("id", user.id);
+    if (error) {
+      // Roll back optimistic update
+      setLocalAvailable(null);
+      setLocalAvailableUntil(undefined);
+      feedbackError();
+      toast("Failed to update availability — try again");
+      return;
+    }
     await refreshUser();
     // Clear overrides — context is now up to date
     setLocalAvailable(null);
@@ -193,10 +215,18 @@ export default function HomePage() {
     // Optimistic update — flip UI immediately
     setLocalAvailable(false);
     setLocalAvailableUntil(null);
-    await supabase
+    const { error } = await supabase
       .from("profiles")
       .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
       .eq("id", user.id);
+    if (error) {
+      // Roll back optimistic update
+      setLocalAvailable(null);
+      setLocalAvailableUntil(undefined);
+      feedbackError();
+      toast("Failed to update availability — try again");
+      return;
+    }
     await refreshUser();
     // Clear overrides — context is now up to date
     setLocalAvailable(null);
@@ -214,11 +244,16 @@ export default function HomePage() {
 
   const saveMood = async () => {
     if (!user) return;
-    feedbackSuccess();
-    await supabase
+    const { error } = await supabase
       .from("profiles")
       .update({ current_mood: mood })
       .eq("id", user.id);
+    if (error) {
+      feedbackError();
+      toast("Failed to save status — try again");
+      return;
+    }
+    feedbackSuccess();
     await refreshUser();
     setMoodDirty(false);
     toast("Status updated! ✨");

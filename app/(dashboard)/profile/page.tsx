@@ -91,10 +91,15 @@ export default function ProfilePage() {
   const updateSetting = async (key: string, value: boolean) => {
     if (!user) return;
     if (value) feedbackToggleOn(); else feedbackToggleOff();
-    await supabase
+    const { error } = await supabase
       .from("profiles")
       .update({ [key]: value })
       .eq("id", user.id);
+    if (error) {
+      feedbackError();
+      toast("Failed to save setting — try again");
+      return;
+    }
     await refreshUser();
   };
 

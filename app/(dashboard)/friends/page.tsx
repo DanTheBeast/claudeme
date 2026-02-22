@@ -41,17 +41,23 @@ export default function FriendsPage() {
   const loadData = async () => {
     if (!user) return;
 
-    const { data: sent } = await supabase
+    const { data: sent, error: sentError } = await supabase
       .from("friendships")
       .select("id, status, friend_id, is_muted")
       .eq("user_id", user.id)
       .eq("status", "accepted");
 
-    const { data: received } = await supabase
+    const { data: received, error: receivedError } = await supabase
       .from("friendships")
       .select("id, status, user_id, is_muted")
       .eq("friend_id", user.id)
       .eq("status", "accepted");
+
+    if (sentError || receivedError) {
+      toast("Couldn't load friends — check your connection");
+      setLoading(false);
+      return;
+    }
 
     const friendEntries = [
       ...(sent || []).map((f) => ({ friendshipId: f.id, friendId: f.friend_id, is_muted: f.is_muted ?? false })),
@@ -149,21 +155,24 @@ export default function FriendsPage() {
 
   const acceptRequest = async (requestId: number) => {
     feedbackSuccess();
-    await supabase.from("friendships").update({ status: "accepted" }).eq("id", requestId);
+    const { error } = await supabase.from("friendships").update({ status: "accepted" }).eq("id", requestId);
+    if (error) { feedbackError(); toast("Failed to accept request"); return; }
     toast("Friend request accepted! 🤝");
     loadData();
   };
 
   const declineRequest = async (requestId: number) => {
     feedbackClick();
-    await supabase.from("friendships").delete().eq("id", requestId);
+    const { error } = await supabase.from("friendships").delete().eq("id", requestId);
+    if (error) { feedbackError(); toast("Failed to decline request"); return; }
     toast("Request declined");
     loadData();
   };
 
   const removeFriend = async (friendshipId: number, name: string) => {
     feedbackClick();
-    await supabase.from("friendships").delete().eq("id", friendshipId);
+    const { error } = await supabase.from("friendships").delete().eq("id", friendshipId);
+    if (error) { feedbackError(); toast("Failed to remove friend"); return; }
     setSelectedFriend(null);
     toast(`${name} removed`);
     loadData();
@@ -171,10 +180,11 @@ export default function FriendsPage() {
 
   const toggleMute = async (friendshipId: number, currentlyMuted: boolean, name: string) => {
     feedbackClick();
-    await supabase
+    const { error } = await supabase
       .from("friendships")
       .update({ is_muted: !currentlyMuted })
       .eq("id", friendshipId);
+    if (error) { feedbackError(); toast("Failed to update mute setting"); return; }
     // Update local state immediately for snappy UI
     setFriends((prev) =>
       prev.map((f) =>
@@ -188,7 +198,7 @@ export default function FriendsPage() {
   };
 
   const inviteFriends = async () => {
-    const inviteUrl = `${window.location.origin}/auth`;
+    const inviteUrl = "https://justcallme.app";
     const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Like you! Join me so we can easily find times to chat.\n\n${inviteUrl}`;
     if (navigator.share) {
       try {

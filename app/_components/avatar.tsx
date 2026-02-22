@@ -25,20 +25,22 @@ export function Avatar({
   online,
   src,
 }: {
-  name: string;
+  name: string | null | undefined;
   id?: string;
   size?: "sm" | "md" | "lg";
   online?: boolean;
   src?: string | null;
 }) {
-  const initials = name
+  const safeName = name || "?";
+  const initials = safeName
     .split(" ")
     .map((w) => w[0])
+    .filter(Boolean)
     .join("")
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || "?";
 
-  const idx = hash(id || name) % COLORS.length;
+  const idx = hash(id || safeName) % COLORS.length;
 
   const sizes = {
     sm: { box: "w-9 h-9 text-xs", dot: "w-2.5 h-2.5" },
@@ -51,7 +53,7 @@ export function Avatar({
       {src ? (
         <img
           src={src}
-          alt={name}
+          alt={safeName}
           className={`${sizes[size].box} rounded-full object-cover`}
         />
       ) : (

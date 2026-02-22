@@ -164,7 +164,8 @@ export default function SchedulePage() {
 
   const removeWindow = async (id: number) => {
     feedbackClick();
-    await supabase.from("availability_windows").delete().eq("id", id);
+    const { error } = await supabase.from("availability_windows").delete().eq("id", id);
+    if (error) { feedbackError(); toast("Failed to remove window"); return; }
     toast("Window removed");
     loadWindows();
   };
