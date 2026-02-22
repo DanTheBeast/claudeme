@@ -48,6 +48,13 @@ export default function DashboardLayout({
   const launchJinglePlayed = useRef(false);
   const initialLoadDone = useRef(false);
   const pushRegistered = useRef(false);
+  const splashHidden = useRef(false);
+
+  const hideSplash = useCallback(async () => {
+    if (splashHidden.current) return;
+    splashHidden.current = true;
+    try { await SplashScreen.hide(); } catch {}
+  }, []);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -59,7 +66,7 @@ export default function DashboardLayout({
         setAuthed(false);
         setLoading(false);
         initialLoadDone.current = true;
-        try { await SplashScreen.hide(); } catch {}
+        hideSplash();
         return;
       }
 
@@ -84,18 +91,19 @@ export default function DashboardLayout({
       // defer everything else (push, realtime) so UI renders first
       setLoading(false);
       initialLoadDone.current = true;
-      try { await SplashScreen.hide(); } catch {}
+      hideSplash();
 
       if (!launchJinglePlayed.current) {
         launchJinglePlayed.current = true;
         setTimeout(() => soundAppLaunch(), 300);
       }
 
-      // Defer push registration until after UI is interactive
+      // Defer push registration + badge clear until after UI is interactive
       setTimeout(() => {
         if (!pushRegistered.current) {
           pushRegistered.current = true;
           registerPushNotifications(session.user.id, supabase).catch(() => {});
+          clearNotificationBadge();
         }
       }, 1000);
 
@@ -103,9 +111,9 @@ export default function DashboardLayout({
       setAuthed(false);
       setLoading(false);
       initialLoadDone.current = true;
-      try { await SplashScreen.hide(); } catch {}
+      hideSplash();
     }
-  }, [supabase]);
+  }, [supabase, hideSplash]);
 
   useEffect(() => {
     // Safety net: never stay stuck on loading screen beyond 15s
@@ -113,7 +121,7 @@ export default function DashboardLayout({
       if (!initialLoadDone.current) {
         setLoading(false);
         initialLoadDone.current = true;
-        try { SplashScreen.hide(); } catch {}
+        hideSplash();
       }
     }, 15000);
 
@@ -130,7 +138,6 @@ export default function DashboardLayout({
     }, 3000);
 
     fetchProfile();
-    clearNotificationBadge();
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
