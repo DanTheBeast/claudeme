@@ -1,5 +1,18 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
+import { DM_Sans, Fraunces } from "next/font/google";
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "CallMe — Meaningful Phone Conversations",
@@ -22,12 +35,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet" />
-      </head>
-      <body className="min-h-screen">{children}</body>
+      <head />
+      <body className={`min-h-screen ${dmSans.variable} ${fraunces.variable}`}>{children}</body>
     </html>
   );
 }

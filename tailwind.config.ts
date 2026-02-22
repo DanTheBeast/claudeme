@@ -18,8 +18,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ["'Fraunces'", "serif"],
-        sans: ["'DM Sans'", "system-ui", "sans-serif"],
+        display: ["var(--font-fraunces)", "serif"],
+        sans: ["var(--font-dm-sans)", "system-ui", "sans-serif"],
       },
     },
   },
