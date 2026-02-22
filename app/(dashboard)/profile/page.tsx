@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Camera,
   Bug,
+  Lightbulb,
   Volume2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -386,6 +387,14 @@ export default function ProfilePage() {
           className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
         >
           <Bug className="w-[18px] h-[18px]" /> Report a Bug
+        </a>
+
+        {/* Feature Requests */}
+        <a
+          href="mailto:hello@justcallme.app?subject=Feature%20Request&body=Describe%20your%20feature%20request%20here..."
+          className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
+        >
+          <Lightbulb className="w-[18px] h-[18px]" /> Feature Request
         </a>
 
         {/* Sign Out */}
