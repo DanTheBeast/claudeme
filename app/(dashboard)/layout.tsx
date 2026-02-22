@@ -22,12 +22,14 @@ interface AppContextType {
   user: Profile | null;
   refreshUser: () => Promise<void>;
   toast: (msg: string) => void;
+  pendingRequests: number;
 }
 
 const AppContext = createContext<AppContextType>({
   user: null,
   refreshUser: async () => {},
   toast: () => {},
+  pendingRequests: 0,
 });
 
 export const useApp = () => useContext(AppContext);
@@ -41,6 +43,7 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState(0);
   const supabase = useMemo(() => createClient(), []);
   const launchJinglePlayed = useRef(false);
   const initialLoadDone = useRef(false);
@@ -68,6 +71,14 @@ export default function DashboardLayout({
 
       if (data) setUser(data as Profile);
       setAuthed(true);
+
+      // Fetch pending friend requests count for nav badge
+      const { count } = await supabase
+        .from("friendships")
+        .select("id", { count: "exact", head: true })
+        .eq("friend_id", session.user.id)
+        .eq("status", "pending");
+      setPendingRequests(count ?? 0);
 
       // Hide splash and play jingle as soon as profile is loaded —
       // defer everything else (push, realtime) so UI renders first
@@ -154,15 +165,20 @@ export default function DashboardLayout({
       }
     });
 
+    // Use a ref so the realtime callback always sees the latest user ID
+    // without capturing a stale closure (user is null at effect setup time).
     const channel = supabase
       .channel("profile-changes")
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "profiles" },
         (payload) => {
-          if (user && payload.new.id === user.id) {
-            setUser(payload.new as Profile);
-          }
+          setUser((current) => {
+            if (current && payload.new.id === current.id) {
+              return payload.new as Profile;
+            }
+            return current;
+          });
         }
       )
       .subscribe();
@@ -194,14 +210,14 @@ export default function DashboardLayout({
   }
 
   return (
-    <AppContext.Provider value={{ user, refreshUser: fetchProfile, toast }}>
+    <AppContext.Provider value={{ user, refreshUser: fetchProfile, toast, pendingRequests }}>
       <div className="max-w-md mx-auto min-h-screen flex flex-col">
         <div className="flex-1">{children}</div>
         <footer className="text-center py-4 text-xs text-gray-500 pb-20">
           Copyright Dan Fields 2026. All Rights Reserved.
         </footer>
       </div>
-      <BottomNav />
+      <BottomNav pendingRequests={pendingRequests} />
       {toastMsg && (
         <Toast message={toastMsg} onDone={() => setToastMsg(null)} />
       )}

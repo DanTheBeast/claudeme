@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 const COLORS = [
   "from-indigo-500 to-violet-500",
   "from-emerald-500 to-green-600",
@@ -31,14 +35,17 @@ export function Avatar({
   online?: boolean;
   src?: string | null;
 }) {
+  const [imgError, setImgError] = useState(false);
+
   const safeName = name || "?";
-  const initials = safeName
-    .split(" ")
-    .map((w) => w[0])
-    .filter(Boolean)
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "?";
+  const initials =
+    safeName
+      .split(" ")
+      .map((w) => w[0])
+      .filter(Boolean)
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "?";
 
   const idx = hash(id || safeName) % COLORS.length;
 
@@ -48,13 +55,16 @@ export function Avatar({
     lg: { box: "w-[72px] h-[72px] text-xl", dot: "w-4 h-4" },
   };
 
+  const showImage = src && !imgError;
+
   return (
     <div className="relative flex-shrink-0">
-      {src ? (
+      {showImage ? (
         <img
           src={src}
           alt={safeName}
           className={`${sizes[size].box} rounded-full object-cover`}
+          onError={() => setImgError(true)}
         />
       ) : (
         <div

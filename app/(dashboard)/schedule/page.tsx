@@ -326,7 +326,7 @@ export default function SchedulePage() {
 
                 {/* User's own windows */}
                 {dayWindows.length === 0 ? (
-                  <p className="text-xs text-gray-300">No availability</p>
+                  <p className="text-xs text-gray-400">No availability set</p>
                 ) : (
                   <div className="flex flex-col gap-1.5">
                     {dayWindows.map((w) => (
@@ -347,7 +347,8 @@ export default function SchedulePage() {
                         </div>
                         <button
                           onClick={() => removeWindow(w.id)}
-                          className="text-red-400 hover:text-red-600 p-1 transition-colors"
+                          className="text-red-400 hover:text-red-600 p-3 -m-1 transition-colors"
+                          aria-label="Remove window"
                         >
                           <X className="w-4 h-4" />
                         </button>

@@ -12,7 +12,7 @@ const items = [
   { href: "/profile", icon: User, label: "Profile" },
 ];
 
-export function BottomNav() {
+export function BottomNav({ pendingRequests = 0 }: { pendingRequests?: number }) {
   const pathname = usePathname();
 
   return (
@@ -20,18 +20,26 @@ export function BottomNav() {
       <div className="max-w-md mx-auto flex items-center justify-around py-1.5 pb-2">
         {items.map(({ href, icon: Icon, label }) => {
           const active = pathname === href;
+          const showBadge = href === "/friends" && pendingRequests > 0;
           return (
             <Link
               key={href}
               href={href}
               onClick={() => feedbackClick()}
-              className={`flex flex-col items-center gap-0.5 py-1.5 px-4 transition-colors ${
+              className={`relative flex flex-col items-center gap-0.5 py-1.5 px-4 transition-colors ${
                 active
                   ? "text-callme"
                   : "text-[#c0bbb4] hover:text-gray-500"
               }`}
             >
-              <Icon className="w-[22px] h-[22px]" strokeWidth={1.8} />
+              <div className="relative">
+                <Icon className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+                    {pendingRequests > 9 ? "9+" : pendingRequests}
+                  </span>
+                )}
+              </div>
               <span className="text-[11px] font-medium">{label}</span>
             </Link>
           );

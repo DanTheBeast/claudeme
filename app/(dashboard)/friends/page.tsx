@@ -24,7 +24,7 @@ import {
 import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
 export default function FriendsPage() {
-  const { user, toast } = useApp();
+  const { user, toast, refreshUser } = useApp();
   const supabase = createClient();
 
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
@@ -160,6 +160,7 @@ export default function FriendsPage() {
     if (error) { feedbackError(); toast("Failed to accept request"); return; }
     toast("Friend request accepted! 🤝");
     loadData();
+    refreshUser(); // refreshes pending badge count
   };
 
   const declineRequest = async (requestId: number) => {
@@ -168,6 +169,7 @@ export default function FriendsPage() {
     if (error) { feedbackError(); toast("Failed to decline request"); return; }
     toast("Request declined");
     loadData();
+    refreshUser(); // refreshes pending badge count
   };
 
   const removeFriend = async (friendshipId: number, name: string) => {
@@ -175,6 +177,7 @@ export default function FriendsPage() {
     const { error } = await supabase.from("friendships").delete().eq("id", friendshipId);
     if (error) { feedbackError(); toast("Failed to remove friend"); return; }
     setSelectedFriend(null);
+    setConfirmRemove(false);
     toast(`${name} removed`);
     loadData();
   };
@@ -264,10 +267,10 @@ export default function FriendsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => acceptRequest(req.id)} className="callme-gradient text-white w-8 h-8 rounded-full flex items-center justify-center">
+                    <button onClick={() => acceptRequest(req.id)} className="callme-gradient text-white w-11 h-11 rounded-full flex items-center justify-center">
                       <Check className="w-4 h-4" />
                     </button>
-                    <button onClick={() => declineRequest(req.id)} className="bg-gray-100 text-gray-500 w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-200">
+                    <button onClick={() => declineRequest(req.id)} className="bg-gray-100 text-gray-500 w-11 h-11 rounded-full flex items-center justify-center hover:bg-gray-200">
                       <X className="w-4 h-4" />
                     </button>
                   </div>

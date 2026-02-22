@@ -12,6 +12,7 @@ import {
   Phone,
   Shield,
   Bell,
+  Mail,
   Eye,
   Users,
   Clock,
@@ -150,7 +151,7 @@ export default function ProfilePage() {
       key: "enable_email_notifications",
       title: "Email Notifications",
       desc: "Receive notifications via email",
-      icon: Bell,
+      icon: Mail,
     },
     {
       key: "notify_availability_changes",
@@ -222,7 +223,7 @@ export default function ProfilePage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto}
-                className="absolute bottom-0 right-0 w-8 h-8 bg-callme rounded-full flex items-center justify-center shadow-md border-2 border-white"
+                className="absolute bottom-0 right-0 w-10 h-10 bg-callme rounded-full flex items-center justify-center shadow-md border-2 border-white"
               >
                 {uploadingPhoto ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
