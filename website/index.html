@@ -267,8 +267,14 @@
 
     .moments-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 20px;
+    }
+
+    @media (min-width: 700px) {
+      .moments-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
     }
 
     .moment-card {
@@ -728,6 +734,21 @@
           <span class="moment-emoji">☕</span>
           <p class="moment-scene">Coffee's brewing. You've got 15 minutes before the day starts.</p>
           <p class="moment-action">Your friend across the country is also up early. Timing is everything.</p>
+        </div>
+        <div class="moment-card">
+          <span class="moment-emoji">🍜</span>
+          <p class="moment-scene">Lunch break at your desk. Phone in hand. No meetings for an hour.</p>
+          <p class="moment-action">Go available. Someone you've been meaning to catch up with finally calls.</p>
+        </div>
+        <div class="moment-card">
+          <span class="moment-emoji">🎧</span>
+          <p class="moment-scene">Long drive on the highway. Cruise control on. Nothing but time and road ahead.</p>
+          <p class="moment-action">Tap available. Hands-free the whole way. Best conversation you've had in months.</p>
+        </div>
+        <div class="moment-card">
+          <span class="moment-emoji">🧺</span>
+          <p class="moment-scene">Folding laundry. Completely mindless. Ears wide open.</p>
+          <p class="moment-action">Set available for 30 minutes. Your friend who always texts "we should catch up" finally does.</p>
         </div>
         <div class="moment-card moment-card--origin">
           <div class="moment-origin-badge">The origin story</div>
