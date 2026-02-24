@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
+import { cacheRead, cacheWrite } from "@/app/_lib/cache";
 import { useApp } from "./layout";
 import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick, feedbackError } from "@/app/_lib/haptics";
 import { FriendCard } from "@/app/_components/friend-card";
@@ -46,11 +47,12 @@ export default function HomePage() {
   const { user, refreshUser, toast, refreshKey } = useApp();
   const supabase = createClient();
 
-  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
+  const cached = user ? cacheRead<FriendWithProfile[]>("home_friends", user.id) : null;
+  const [friends, setFriends] = useState<FriendWithProfile[]>(cached ?? []);
   const [mood, setMood] = useState(user?.current_mood || "");
   const [moodDirty, setMoodDirty] = useState(false);
-  const [loadingFriends, setLoadingFriends] = useState(true);
-  const friendsLoadedOnce = useRef(false);
+  const [loadingFriends, setLoadingFriends] = useState(cached === null);
+  const friendsLoadedOnce = useRef(cached !== null);
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
@@ -135,6 +137,7 @@ export default function HomePage() {
       });
 
       setFriends(result);
+      cacheWrite("home_friends", user!.id, result);
       friendsLoadedOnce.current = true;
       setLoadingFriends(false);
     }

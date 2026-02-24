@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
+import { cacheRead, cacheWrite } from "@/app/_lib/cache";
 import { useApp } from "../layout";
 import { feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
@@ -112,11 +113,13 @@ export default function SchedulePage() {
   const { user, toast, refreshKey } = useApp();
   const supabase = createClient();
 
-  const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
-  const [friendWindows, setFriendWindows] = useState<FriendWindow[]>([]);
-  const [friendProfiles, setFriendProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const loadedOnce = useRef(false);
+  type ScheduleCache = { windows: AvailabilityWindow[]; friendWindows: FriendWindow[]; friendProfiles: Profile[] };
+  const cachedSchedule = user ? cacheRead<ScheduleCache>("schedule_page", user.id) : null;
+  const [windows, setWindows] = useState<AvailabilityWindow[]>(cachedSchedule?.windows ?? []);
+  const [friendWindows, setFriendWindows] = useState<FriendWindow[]>(cachedSchedule?.friendWindows ?? []);
+  const [friendProfiles, setFriendProfiles] = useState<Profile[]>(cachedSchedule?.friendProfiles ?? []);
+  const [loading, setLoading] = useState(cachedSchedule === null);
+  const loadedOnce = useRef(cachedSchedule !== null);
   const [showFriends, setShowFriends] = useState(true);
   const [addModal, setAddModal] = useState<{
     day: number;
@@ -130,6 +133,11 @@ export default function SchedulePage() {
   const loadWindows = async () => {
     if (!user) return;
 
+    // Collect into locals so we can set state and write cache atomically at the end
+    let newWindows: AvailabilityWindow[] = windows;
+    let newFriendProfiles: Profile[] = friendProfiles;
+    let newFriendWindows: FriendWindow[] = friendWindows;
+
     // Load user's own windows
     const { data, error: windowsErr } = await supabase
       .from("availability_windows")
@@ -138,11 +146,9 @@ export default function SchedulePage() {
       .order("day_of_week")
       .order("start_time");
 
-    // Only update state if the query succeeded — don't wipe existing data on auth errors
-    if (!windowsErr) setWindows((data || []) as AvailabilityWindow[]);
+    if (!windowsErr) newWindows = (data || []) as AvailabilityWindow[];
 
-    // Load friends — exclude muted ones (mute is bidirectional:
-    // if either side muted the other, hide schedule windows for both)
+    // Load friends — exclude muted ones
     const { data: sent, error: sentErr } = await supabase
       .from("friendships")
       .select("friend_id, is_muted")
@@ -155,40 +161,30 @@ export default function SchedulePage() {
       .eq("friend_id", user.id)
       .eq("status", "accepted");
 
-    // If friendship queries failed, bail without wiping friend data
-    if (sentErr || receivedErr) {
-      loadedOnce.current = true;
-      setLoading(false);
-      return;
-    }
+    if (!sentErr && !receivedErr) {
+      const friendIds = [
+        ...(sent || []).filter((f) => !f.is_muted).map((f) => f.friend_id),
+        ...(received || []).filter((f) => !f.is_muted).map((f) => f.user_id),
+      ];
 
-    const friendIds = [
-      ...(sent || []).filter((f) => !f.is_muted).map((f) => f.friend_id),
-      ...(received || []).filter((f) => !f.is_muted).map((f) => f.user_id),
-    ];
+      if (friendIds.length > 0) {
+        const { data: profiles, error: profilesErr } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", friendIds);
 
-    if (friendIds.length > 0) {
-      // Load friend profiles
-      const { data: profiles, error: profilesErr } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", friendIds);
+        const { data: fWindows, error: fWindowsErr } = await supabase
+          .from("availability_windows")
+          .select("*")
+          .in("user_id", friendIds)
+          .order("start_time");
 
-      // Load friends' availability windows
-      const { data: fWindows, error: fWindowsErr } = await supabase
-        .from("availability_windows")
-        .select("*")
-        .in("user_id", friendIds)
-        .order("start_time");
-
-      // Only update friend state if both queries succeeded
-      if (!profilesErr) setFriendProfiles((profiles || []) as Profile[]);
-      if (!fWindowsErr && !profilesErr) {
-        const profileMap = new Map(
-          (profiles || []).map((p: Profile) => [p.id, p])
-        );
-        setFriendWindows(
-          (fWindows || []).map((w: AvailabilityWindow) => {
+        if (!profilesErr) newFriendProfiles = (profiles || []) as Profile[];
+        if (!fWindowsErr && !profilesErr) {
+          const profileMap = new Map(
+            (profiles || []).map((p: Profile) => [p.id, p])
+          );
+          newFriendWindows = (fWindows || []).map((w: AvailabilityWindow) => {
             const friend = profileMap.get(w.user_id) as Profile | undefined;
             const sourceTz = friend?.timezone || "UTC";
             return {
@@ -197,11 +193,15 @@ export default function SchedulePage() {
               localStart: convertTimeToLocal(w.start_time, sourceTz),
               localEnd:   convertTimeToLocal(w.end_time,   sourceTz),
             };
-          })
-        );
+          });
+        }
       }
     }
 
+    setWindows(newWindows);
+    setFriendProfiles(newFriendProfiles);
+    setFriendWindows(newFriendWindows);
+    cacheWrite("schedule_page", user.id, { windows: newWindows, friendWindows: newFriendWindows, friendProfiles: newFriendProfiles });
     loadedOnce.current = true;
     setLoading(false);
   };

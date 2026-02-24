@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
+import { cacheRead, cacheWrite } from "@/app/_lib/cache";
 import { useApp } from "../layout";
 import { feedbackFriendAdded, feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { Avatar } from "@/app/_components/avatar";
@@ -27,14 +28,20 @@ export default function FriendsPage() {
   const { user, toast, refreshUser, refreshKey } = useApp();
   const supabase = createClient();
 
-  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
+  type FriendsCache = {
+    friends: FriendWithProfile[];
+    pending: (Friendship & { requester?: Profile })[];
+    outgoing: (Friendship & { recipient?: Profile })[];
+  };
+  const cachedFriends = user ? cacheRead<FriendsCache>("friends_page", user.id) : null;
+  const [friends, setFriends] = useState<FriendWithProfile[]>(cachedFriends?.friends ?? []);
   const [pendingRequests, setPendingRequests] = useState<
     (Friendship & { requester?: Profile })[]
-  >([]);
+  >(cachedFriends?.pending ?? []);
   const [outgoingRequests, setOutgoingRequests] = useState<
     (Friendship & { recipient?: Profile })[]
-  >([]);
-  const [loading, setLoading] = useState(true);
+  >(cachedFriends?.outgoing ?? []);
+  const [loading, setLoading] = useState(cachedFriends === null);
   const [showAdd, setShowAdd] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
@@ -78,29 +85,31 @@ export default function FriendsPage() {
       ...(received || []).map((f) => ({ friendshipId: f.id, friendId: f.user_id, is_muted: f.is_muted ?? false })),
     ];
 
+    // Collect results into locals so we can cache them all at once
+    let newFriends: FriendWithProfile[] = friends; // keep existing on error
+    let newPending: (Friendship & { requester?: Profile })[] = pendingRequests;
+    let newOutgoing: (Friendship & { recipient?: Profile })[] = outgoingRequests;
+
     if (friendEntries.length > 0) {
       const { data, error: profilesErr } = await supabase
         .from("profiles")
         .select("*")
         .in("id", friendEntries.map((e) => e.friendId));
 
-      // Only update friends list if the query succeeded
       if (!profilesErr) {
         const profiles = (data || []) as Profile[];
-        setFriends(
-          profiles.map((p) => {
-            const entry = friendEntries.find((e) => e.friendId === p.id);
-            return {
-              id: entry?.friendshipId || 0,
-              status: "accepted",
-              is_muted: entry?.is_muted ?? false,
-              friend: p,
-            };
-          })
-        );
+        newFriends = profiles.map((p) => {
+          const entry = friendEntries.find((e) => e.friendId === p.id);
+          return {
+            id: entry?.friendshipId || 0,
+            status: "accepted",
+            is_muted: entry?.is_muted ?? false,
+            friend: p,
+          };
+        });
       }
     } else {
-      setFriends([]);
+      newFriends = [];
     }
 
     // Pending incoming requests
@@ -117,16 +126,13 @@ export default function FriendsPage() {
           .from("profiles")
           .select("*")
           .in("id", requesterIds);
-
-        setPendingRequests(
-          incoming.map((r) => ({
-            ...r,
-            is_muted: r.is_muted ?? false,
-            requester: (requesterProfiles || []).find((p) => p.id === r.user_id) as Profile | undefined,
-          }))
-        );
+        newPending = incoming.map((r) => ({
+          ...r,
+          is_muted: r.is_muted ?? false,
+          requester: (requesterProfiles || []).find((p) => p.id === r.user_id) as Profile | undefined,
+        }));
       } else {
-        setPendingRequests([]);
+        newPending = [];
       }
     }
 
@@ -144,18 +150,21 @@ export default function FriendsPage() {
           .from("profiles")
           .select("*")
           .in("id", recipientIds);
-        setOutgoingRequests(
-          outgoing.map((r) => ({
-            ...r,
-            is_muted: r.is_muted ?? false,
-            recipient: (recipientProfiles || []).find((p) => p.id === r.friend_id) as Profile | undefined,
-          }))
-        );
+        newOutgoing = outgoing.map((r) => ({
+          ...r,
+          is_muted: r.is_muted ?? false,
+          recipient: (recipientProfiles || []).find((p) => p.id === r.friend_id) as Profile | undefined,
+        }));
       } else {
-        setOutgoingRequests([]);
+        newOutgoing = [];
       }
     }
 
+    // Apply all state updates and write cache atomically
+    setFriends(newFriends);
+    setPendingRequests(newPending);
+    setOutgoingRequests(newOutgoing);
+    cacheWrite("friends_page", user!.id, { friends: newFriends, pending: newPending, outgoing: newOutgoing });
     setLoading(false);
   };
 
