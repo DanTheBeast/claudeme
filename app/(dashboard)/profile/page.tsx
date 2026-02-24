@@ -126,6 +126,37 @@ export default function ProfilePage() {
   };
 
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      // Clear session and local storage
+      try {
+        Object.keys(localStorage).forEach((k) => localStorage.removeItem(k));
+      } catch {}
+      window.location.href = "/";
+    } catch {
+      feedbackError();
+      toast("Failed to delete account — please try again");
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -466,6 +497,43 @@ export default function ProfilePage() {
             className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-red-200 rounded-[16px] text-red-500 font-medium text-sm hover:bg-red-50 transition-colors"
           >
             <LogOut className="w-[18px] h-[18px]" /> Sign Out
+          </button>
+        )}
+
+        {/* Delete Account — two-step, visually separate from Sign Out */}
+        {confirmDelete ? (
+          <div className="bg-white border-[1.5px] border-red-200 rounded-[16px] p-4">
+            <p className="text-sm font-semibold text-red-600 mb-1">Delete your account?</p>
+            <p className="text-xs text-gray-500 mb-3">
+              This permanently deletes your profile, friends, and all data. This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 bg-gray-100 rounded-[12px] text-gray-600 font-medium text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 bg-red-500 rounded-[12px] text-white font-semibold text-sm flex items-center justify-center gap-1.5"
+              >
+                {deleting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  "Yes, delete everything"
+                )}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="w-full text-center text-xs text-gray-400 hover:text-red-400 transition-colors py-2"
+          >
+            Delete Account
           </button>
         )}
 
