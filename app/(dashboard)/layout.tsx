@@ -53,6 +53,7 @@ export default function DashboardLayout({
   const initialLoadDone = useRef(false);
   const pushRegistered = useRef(false);
   const splashHidden = useRef(false);
+  const foregroundBusy = useRef(false);
 
   const hideSplash = useCallback(async () => {
     if (splashHidden.current) return;
@@ -154,14 +155,22 @@ export default function DashboardLayout({
     fetchProfile();
 
     const handleForeground = async () => {
-      // Refresh the session first in case the token expired while backgrounded,
-      // then re-fetch the profile so queries don't fail with auth errors.
-      // Await fetchProfile so the session is confirmed fresh before pages re-query.
-      try { await supabase.auth.refreshSession(); } catch {}
-      await fetchProfile();
-      clearNotificationBadge();
-      // Bump refreshKey only after fetchProfile completes — pages will have a valid session
-      setRefreshKey((k) => k + 1);
+      // Guard against double-fire: both visibilitychange and appStateChange fire
+      // on iOS foreground. Only let one through at a time.
+      if (foregroundBusy.current) return;
+      foregroundBusy.current = true;
+      try {
+        // Refresh the session first in case the token expired while backgrounded,
+        // then re-fetch the profile so queries don't fail with auth errors.
+        // Await fetchProfile so the session is confirmed fresh before pages re-query.
+        try { await supabase.auth.refreshSession(); } catch {}
+        await fetchProfile();
+        clearNotificationBadge();
+        // Bump refreshKey only after fetchProfile completes — pages will have a valid session
+        setRefreshKey((k) => k + 1);
+      } finally {
+        foregroundBusy.current = false;
+      }
     };
 
     // visibilitychange covers web/browser; appStateChange covers native iOS background→foreground
