@@ -118,11 +118,17 @@ export default function HomePage() {
             ("friend_id" in f && f.friend_id === p.id) ||
             ("user_id" in f && f.user_id === p.id)
         );
+        // Respect show_online_status — if the friend has hidden their status,
+        // treat them as unavailable so they don't show in the "Available now" section.
+        const friend = p as Profile;
+        if (!friend.show_online_status) {
+          friend.is_available = false;
+        }
         return {
           id: friendship?.id || 0,
           status: "accepted",
           is_muted: false,
-          friend: p as Profile,
+          friend,
         };
       });
 

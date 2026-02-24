@@ -17,6 +17,7 @@ import AuthPage from "@/app/auth/page";
 import { soundAppLaunch } from "@/app/_lib/haptics";
 import { registerPushNotifications, clearNotificationBadge } from "@/app/_lib/push-notifications";
 import { SplashScreen } from "@capacitor/splash-screen";
+import { App as CapApp } from "@capacitor/app";
 
 interface AppContextType {
   user: Profile | null;
@@ -149,13 +150,25 @@ export default function DashboardLayout({
 
     fetchProfile();
 
+    const handleForeground = async () => {
+      // Refresh the session first in case the token expired while backgrounded,
+      // then re-fetch the profile so queries don't fail with auth errors.
+      try { await supabase.auth.refreshSession(); } catch {}
+      fetchProfile();
+      clearNotificationBadge();
+    };
+
+    // visibilitychange covers web/browser; appStateChange covers native iOS background→foreground
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        fetchProfile();
-        clearNotificationBadge();
-      }
+      if (document.visibilityState === "visible") handleForeground();
     };
     document.addEventListener("visibilitychange", handleVisibility);
+
+    // Capacitor app state — fires when returning from background on iOS
+    let appStateListener: { remove: () => void } | null = null;
+    CapApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) handleForeground();
+    }).then((l) => { appStateListener = l; }).catch(() => {});
 
     // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -215,6 +228,7 @@ export default function DashboardLayout({
       clearTimeout(timeout);
       clearTimeout(pushRetry);
       document.removeEventListener("visibilitychange", handleVisibility);
+      appStateListener?.remove();
       subscription.unsubscribe();
       channelPromise.then((ch) => { if (ch) supabase.removeChannel(ch); });
     };

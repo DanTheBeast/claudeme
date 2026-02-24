@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
     // Fetch sender and recipient profiles
     const [{ data: sender }, { data: recipient }] = await Promise.all([
       supabase.from("profiles").select("display_name").eq("id", senderId).single(),
-      supabase.from("profiles").select("display_name, email, enable_push_notifications, notify_friend_requests").eq("id", recipientId).single(),
+      supabase.from("profiles").select("display_name, email, enable_push_notifications, enable_email_notifications, notify_friend_requests, enable_quiet_hours, timezone").eq("id", recipientId).single(),
     ]);
 
     if (!sender || !recipient) {
@@ -207,8 +207,16 @@ Deno.serve(async (req) => {
 
     const tasks: Promise<void>[] = [];
 
+    // Check quiet hours for the recipient
+    const inQuietHours = (() => {
+      if (!recipient.enable_quiet_hours) return false;
+      const tz = recipient.timezone || "UTC";
+      const localHour = parseInt(new Date().toLocaleString("en-US", { timeZone: tz, hour: "numeric", hour12: false }));
+      return localHour >= 22 || localHour < 8;
+    })();
+
     // Push notification
-    if (recipient.enable_push_notifications && recipient.notify_friend_requests) {
+    if (recipient.enable_push_notifications && recipient.notify_friend_requests && !inQuietHours) {
       const { data: tokens } = await supabase
         .from("push_tokens")
         .select("token")
@@ -218,8 +226,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Email notification
-    if (recipientEmail) {
+    // Email notification — only if recipient has email notifications enabled
+    if (recipientEmail && recipient.enable_email_notifications !== false) {
       tasks.push(sendEmail(recipientEmail, recipientName, senderName));
     }
 
