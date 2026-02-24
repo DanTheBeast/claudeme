@@ -28,20 +28,14 @@ export default function FriendsPage() {
   const { user, toast, refreshUser, refreshKey } = useApp();
   const supabase = createClient();
 
-  type FriendsCache = {
-    friends: FriendWithProfile[];
-    pending: (Friendship & { requester?: Profile })[];
-    outgoing: (Friendship & { recipient?: Profile })[];
-  };
-  const cachedFriends = user ? cacheRead<FriendsCache>("friends_page", user.id) : null;
-  const [friends, setFriends] = useState<FriendWithProfile[]>(cachedFriends?.friends ?? []);
+  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [pendingRequests, setPendingRequests] = useState<
     (Friendship & { requester?: Profile })[]
-  >(cachedFriends?.pending ?? []);
+  >([]);
   const [outgoingRequests, setOutgoingRequests] = useState<
     (Friendship & { recipient?: Profile })[]
-  >(cachedFriends?.outgoing ?? []);
-  const [loading, setLoading] = useState(cachedFriends === null);
+  >([]);
+  const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
@@ -169,6 +163,20 @@ export default function FriendsPage() {
   };
 
   useEffect(() => {
+    if (!user) return;
+    // Seed from cache immediately so there's no skeleton on resume
+    type FriendsCache = {
+      friends: FriendWithProfile[];
+      pending: (Friendship & { requester?: Profile })[];
+      outgoing: (Friendship & { recipient?: Profile })[];
+    };
+    const cached = cacheRead<FriendsCache>("friends_page", user.id);
+    if (cached && loading) {
+      setFriends(cached.friends);
+      setPendingRequests(cached.pending);
+      setOutgoingRequests(cached.outgoing);
+      setLoading(false);
+    }
     loadData();
   }, [user?.id, refreshKey]);
 

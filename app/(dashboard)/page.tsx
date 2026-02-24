@@ -47,12 +47,11 @@ export default function HomePage() {
   const { user, refreshUser, toast, refreshKey } = useApp();
   const supabase = createClient();
 
-  const cached = user ? cacheRead<FriendWithProfile[]>("home_friends", user.id) : null;
-  const [friends, setFriends] = useState<FriendWithProfile[]>(cached ?? []);
+  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [mood, setMood] = useState(user?.current_mood || "");
   const [moodDirty, setMoodDirty] = useState(false);
-  const [loadingFriends, setLoadingFriends] = useState(cached === null);
-  const friendsLoadedOnce = useRef(cached !== null);
+  const [loadingFriends, setLoadingFriends] = useState(true);
+  const friendsLoadedOnce = useRef(false);
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
@@ -68,6 +67,14 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!user) return;
+
+    // Seed from cache immediately so there's no skeleton on resume
+    const cached = cacheRead<FriendWithProfile[]>("home_friends", user.id);
+    if (cached && !friendsLoadedOnce.current) {
+      setFriends(cached);
+      setLoadingFriends(false);
+      friendsLoadedOnce.current = true;
+    }
 
     async function loadFriends() {
       const { data: sentData, error: sentErr } = await supabase

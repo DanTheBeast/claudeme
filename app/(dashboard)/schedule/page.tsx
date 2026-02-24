@@ -113,13 +113,11 @@ export default function SchedulePage() {
   const { user, toast, refreshKey } = useApp();
   const supabase = createClient();
 
-  type ScheduleCache = { windows: AvailabilityWindow[]; friendWindows: FriendWindow[]; friendProfiles: Profile[] };
-  const cachedSchedule = user ? cacheRead<ScheduleCache>("schedule_page", user.id) : null;
-  const [windows, setWindows] = useState<AvailabilityWindow[]>(cachedSchedule?.windows ?? []);
-  const [friendWindows, setFriendWindows] = useState<FriendWindow[]>(cachedSchedule?.friendWindows ?? []);
-  const [friendProfiles, setFriendProfiles] = useState<Profile[]>(cachedSchedule?.friendProfiles ?? []);
-  const [loading, setLoading] = useState(cachedSchedule === null);
-  const loadedOnce = useRef(cachedSchedule !== null);
+  const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
+  const [friendWindows, setFriendWindows] = useState<FriendWindow[]>([]);
+  const [friendProfiles, setFriendProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const loadedOnce = useRef(false);
   const [showFriends, setShowFriends] = useState(true);
   const [addModal, setAddModal] = useState<{
     day: number;
@@ -207,6 +205,17 @@ export default function SchedulePage() {
   };
 
   useEffect(() => {
+    if (!user) return;
+    // Seed from cache immediately so there's no skeleton on resume
+    type ScheduleCache = { windows: AvailabilityWindow[]; friendWindows: FriendWindow[]; friendProfiles: Profile[] };
+    const cached = cacheRead<ScheduleCache>("schedule_page", user.id);
+    if (cached && !loadedOnce.current) {
+      setWindows(cached.windows);
+      setFriendWindows(cached.friendWindows);
+      setFriendProfiles(cached.friendProfiles);
+      setLoading(false);
+      loadedOnce.current = true;
+    }
     loadWindows();
   }, [user?.id, refreshKey]);
 
