@@ -24,6 +24,7 @@ interface AppContextType {
   refreshUser: () => Promise<void>;
   toast: (msg: string) => void;
   pendingRequests: number;
+  refreshKey: number;
 }
 
 const AppContext = createContext<AppContextType>({
@@ -31,6 +32,7 @@ const AppContext = createContext<AppContextType>({
   refreshUser: async () => {},
   toast: () => {},
   pendingRequests: 0,
+  refreshKey: 0,
 });
 
 export const useApp = () => useContext(AppContext);
@@ -45,6 +47,7 @@ export default function DashboardLayout({
   const [authed, setAuthed] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
   const supabase = useMemo(() => createClient(), []);
   const launchJinglePlayed = useRef(false);
   const initialLoadDone = useRef(false);
@@ -156,6 +159,8 @@ export default function DashboardLayout({
       try { await supabase.auth.refreshSession(); } catch {}
       fetchProfile();
       clearNotificationBadge();
+      // Bump refreshKey so pages re-run their data fetches
+      setRefreshKey((k) => k + 1);
     };
 
     // visibilitychange covers web/browser; appStateChange covers native iOS background→foreground
@@ -252,7 +257,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <AppContext.Provider value={{ user, refreshUser: fetchProfile, toast, pendingRequests }}>
+    <AppContext.Provider value={{ user, refreshUser: fetchProfile, toast, pendingRequests, refreshKey }}>
       <div className="max-w-md mx-auto min-h-screen flex flex-col">
         <div className="flex-1">{children}</div>
       </div>

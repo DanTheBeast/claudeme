@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  Zap,
   KeyRound,
 } from "lucide-react";
 
@@ -199,9 +198,7 @@ export default function AuthPage() {
           {step === 2 && (
             <div className="anim-fade-up">
               <div className="text-center mb-6">
-                <div className="w-14 h-14 rounded-[16px] bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center mx-auto mb-4">
-                  <Zap className="w-7 h-7 text-white" />
-                </div>
+                <img src="/logo.png" alt="CallMe" className="w-14 h-14 rounded-[16px] mx-auto mb-4 shadow-md shadow-callme/20" />
                 <h2 className="font-display text-2xl font-bold">
                   {forgotMode ? "Reset your password" : mode === "signup" ? "Create your account" : "Welcome back"}
                 </h2>

@@ -24,7 +24,7 @@ import {
 import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
 export default function FriendsPage() {
-  const { user, toast, refreshUser } = useApp();
+  const { user, toast, refreshUser, refreshKey } = useApp();
   const supabase = createClient();
 
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
@@ -153,7 +153,7 @@ export default function FriendsPage() {
 
   useEffect(() => {
     loadData();
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   // Debounced search — only shows users who allow friend requests,
   // and filters out people already friended or with a pending request.

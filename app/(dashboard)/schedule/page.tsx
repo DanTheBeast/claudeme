@@ -109,7 +109,7 @@ interface FriendWindow extends AvailabilityWindow {
 }
 
 export default function SchedulePage() {
-  const { user, toast } = useApp();
+  const { user, toast, refreshKey } = useApp();
   const supabase = createClient();
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
@@ -197,7 +197,7 @@ export default function SchedulePage() {
 
   useEffect(() => {
     loadWindows();
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   const addWindow = async (w: {
     day: number;

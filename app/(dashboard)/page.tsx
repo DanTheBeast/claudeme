@@ -43,7 +43,7 @@ function formatCountdown(until: string): string {
 }
 
 export default function HomePage() {
-  const { user, refreshUser, toast } = useApp();
+  const { user, refreshUser, toast, refreshKey } = useApp();
   const supabase = createClient();
 
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
@@ -155,7 +155,7 @@ export default function HomePage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   // Keep local mood in sync when the user updates it from the profile page
   // (context refreshes, but the home page's mood state was already initialized).
