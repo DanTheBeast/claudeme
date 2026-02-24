@@ -207,6 +207,7 @@ export default function FriendsPage() {
 
   const sendFriendRequest = async (recipientId: string) => {
     if (!user || sendingRequest) return;
+    if (recipientId === user.id) return;
     setSendingRequest(recipientId);
     const { error } = await supabase.from("friendships").insert({
       user_id: user.id,
