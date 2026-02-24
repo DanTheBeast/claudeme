@@ -76,7 +76,8 @@ export default function HomePage() {
       friendsLoadedOnce.current = true;
     }
 
-    async function loadFriends() {
+    // Returns true on success, false on failure — so caller can retry
+    async function loadFriends(): Promise<boolean> {
       const { data: sentData, error: sentErr } = await supabase
         .from("friendships")
         .select("id, status, friend_id")
@@ -90,11 +91,8 @@ export default function HomePage() {
         .eq("status", "accepted");
 
       if (sentErr || receivedErr) {
-        // Only show error toast on first load — on background re-fetch, keep existing data
-        if (!friendsLoadedOnce.current) toast("Couldn't load friends — check your connection");
-        friendsLoadedOnce.current = true;
         setLoadingFriends(false);
-        return;
+        return false;
       }
 
       const friendIds = [
@@ -104,9 +102,10 @@ export default function HomePage() {
 
       if (friendIds.length === 0) {
         setFriends([]);
+        cacheWrite("home_friends", user!.id, []);
         friendsLoadedOnce.current = true;
         setLoadingFriends(false);
-        return;
+        return true;
       }
 
       const { data: profiles, error: profilesErr } = await supabase
@@ -115,11 +114,8 @@ export default function HomePage() {
         .in("id", friendIds);
 
       if (profilesErr) {
-        // Only show error toast on first load — on background re-fetch, keep existing data
-        if (!friendsLoadedOnce.current) toast("Couldn't load friends — check your connection");
-        friendsLoadedOnce.current = true;
         setLoadingFriends(false);
-        return;
+        return false;
       }
 
       const allFriendships = [...(sentData || []), ...(receivedData || [])];
@@ -147,9 +143,13 @@ export default function HomePage() {
       cacheWrite("home_friends", user!.id, result);
       friendsLoadedOnce.current = true;
       setLoadingFriends(false);
+      return true;
     }
 
-    loadFriends();
+    // Run fetch; if it fails (auth not ready on boot), retry once after 2s
+    loadFriends().then((ok) => {
+      if (!ok) setTimeout(() => loadFriends(), 2000);
+    });
 
     const channel = supabase
       .channel("friends-availability")

@@ -6,7 +6,11 @@
  */
 
 const PREFIX = "callme_cache_";
-const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours — stale after this, ignore
+
+// Availability status is time-sensitive — cache is only used to avoid skeletons
+// on resume, not to serve as a long-term store. Keep it short so a friend's
+// availability is never stale for more than a few minutes.
+const MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CacheEntry<T> {
   data: T;
