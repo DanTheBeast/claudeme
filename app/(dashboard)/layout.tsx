@@ -185,10 +185,19 @@ export default function DashboardLayout({
       if (isActive) handleForeground();
     }).then((l) => { appStateListener = l; }).catch(() => {});
 
-    // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load.
+    // IMPORTANT: only act on explicit SIGNED_OUT — never set authed=false on
+    // TOKEN_REFRESHED or other transient events, which would unmount the entire
+    // dashboard and cause all pages to remount with loading skeletons.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       // Skip the initial INITIAL_SESSION event — fetchProfile already handles it
       if (!initialLoadDone.current) return;
+
+      if (event === "SIGNED_OUT") {
+        setUser(null);
+        setAuthed(false);
+        return;
+      }
 
       if (session?.user) {
         const { data } = await supabase
@@ -204,9 +213,6 @@ export default function DashboardLayout({
             console.error("[CallMe] push registration failed:", e);
           });
         }
-      } else {
-        setUser(null);
-        setAuthed(false);
       }
     });
 
