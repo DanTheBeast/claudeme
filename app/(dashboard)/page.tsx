@@ -81,9 +81,10 @@ export default function HomePage() {
         .eq("status", "accepted");
 
       if (sentErr || receivedErr) {
+        // Only show error toast on first load — on background re-fetch, keep existing data
+        if (!friendsLoadedOnce.current) toast("Couldn't load friends — check your connection");
         friendsLoadedOnce.current = true;
         setLoadingFriends(false);
-        toast("Couldn't load friends — check your connection");
         return;
       }
 
@@ -105,9 +106,10 @@ export default function HomePage() {
         .in("id", friendIds);
 
       if (profilesErr) {
+        // Only show error toast on first load — on background re-fetch, keep existing data
+        if (!friendsLoadedOnce.current) toast("Couldn't load friends — check your connection");
         friendsLoadedOnce.current = true;
         setLoadingFriends(false);
-        toast("Couldn't load friends — check your connection");
         return;
       }
 

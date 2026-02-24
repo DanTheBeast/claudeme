@@ -131,28 +131,36 @@ export default function SchedulePage() {
     if (!user) return;
 
     // Load user's own windows
-    const { data } = await supabase
+    const { data, error: windowsErr } = await supabase
       .from("availability_windows")
       .select("*")
       .eq("user_id", user.id)
       .order("day_of_week")
       .order("start_time");
 
-    setWindows((data || []) as AvailabilityWindow[]);
+    // Only update state if the query succeeded — don't wipe existing data on auth errors
+    if (!windowsErr) setWindows((data || []) as AvailabilityWindow[]);
 
     // Load friends — exclude muted ones (mute is bidirectional:
     // if either side muted the other, hide schedule windows for both)
-    const { data: sent } = await supabase
+    const { data: sent, error: sentErr } = await supabase
       .from("friendships")
       .select("friend_id, is_muted")
       .eq("user_id", user.id)
       .eq("status", "accepted");
 
-    const { data: received } = await supabase
+    const { data: received, error: receivedErr } = await supabase
       .from("friendships")
       .select("user_id, is_muted")
       .eq("friend_id", user.id)
       .eq("status", "accepted");
+
+    // If friendship queries failed, bail without wiping friend data
+    if (sentErr || receivedErr) {
+      loadedOnce.current = true;
+      setLoading(false);
+      return;
+    }
 
     const friendIds = [
       ...(sent || []).filter((f) => !f.is_muted).map((f) => f.friend_id),
@@ -161,34 +169,37 @@ export default function SchedulePage() {
 
     if (friendIds.length > 0) {
       // Load friend profiles
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesErr } = await supabase
         .from("profiles")
         .select("*")
         .in("id", friendIds);
-      setFriendProfiles((profiles || []) as Profile[]);
 
       // Load friends' availability windows
-      const { data: fWindows } = await supabase
+      const { data: fWindows, error: fWindowsErr } = await supabase
         .from("availability_windows")
         .select("*")
         .in("user_id", friendIds)
         .order("start_time");
 
-      const profileMap = new Map(
-        (profiles || []).map((p: Profile) => [p.id, p])
-      );
-      setFriendWindows(
-        (fWindows || []).map((w: AvailabilityWindow) => {
-          const friend = profileMap.get(w.user_id) as Profile | undefined;
-          const sourceTz = friend?.timezone || "UTC";
-          return {
-            ...w,
-            friend,
-            localStart: convertTimeToLocal(w.start_time, sourceTz),
-            localEnd:   convertTimeToLocal(w.end_time,   sourceTz),
-          };
-        })
-      );
+      // Only update friend state if both queries succeeded
+      if (!profilesErr) setFriendProfiles((profiles || []) as Profile[]);
+      if (!fWindowsErr && !profilesErr) {
+        const profileMap = new Map(
+          (profiles || []).map((p: Profile) => [p.id, p])
+        );
+        setFriendWindows(
+          (fWindows || []).map((w: AvailabilityWindow) => {
+            const friend = profileMap.get(w.user_id) as Profile | undefined;
+            const sourceTz = friend?.timezone || "UTC";
+            return {
+              ...w,
+              friend,
+              localStart: convertTimeToLocal(w.start_time, sourceTz),
+              localEnd:   convertTimeToLocal(w.end_time,   sourceTz),
+            };
+          })
+        );
+      }
     }
 
     loadedOnce.current = true;

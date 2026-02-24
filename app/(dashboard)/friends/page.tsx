@@ -68,7 +68,7 @@ export default function FriendsPage() {
       .eq("status", "accepted");
 
     if (sentError || receivedError) {
-      toast("Couldn't load friends — check your connection");
+      // Don't wipe existing data on re-fetch failure (e.g. session mid-refresh)
       setLoading(false);
       return;
     }
@@ -78,74 +78,82 @@ export default function FriendsPage() {
       ...(received || []).map((f) => ({ friendshipId: f.id, friendId: f.user_id, is_muted: f.is_muted ?? false })),
     ];
 
-    let profiles: Profile[] = [];
     if (friendEntries.length > 0) {
-      const { data } = await supabase
+      const { data, error: profilesErr } = await supabase
         .from("profiles")
         .select("*")
         .in("id", friendEntries.map((e) => e.friendId));
-      profiles = (data || []) as Profile[];
+
+      // Only update friends list if the query succeeded
+      if (!profilesErr) {
+        const profiles = (data || []) as Profile[];
+        setFriends(
+          profiles.map((p) => {
+            const entry = friendEntries.find((e) => e.friendId === p.id);
+            return {
+              id: entry?.friendshipId || 0,
+              status: "accepted",
+              is_muted: entry?.is_muted ?? false,
+              friend: p,
+            };
+          })
+        );
+      }
+    } else {
+      setFriends([]);
     }
 
-    setFriends(
-      profiles.map((p) => {
-        const entry = friendEntries.find((e) => e.friendId === p.id);
-        return {
-          id: entry?.friendshipId || 0,
-          status: "accepted",
-          is_muted: entry?.is_muted ?? false,
-          friend: p,
-        };
-      })
-    );
-
     // Pending incoming requests
-    const { data: incoming } = await supabase
+    const { data: incoming, error: incomingErr } = await supabase
       .from("friendships")
       .select("*")
       .eq("friend_id", user.id)
       .eq("status", "pending");
 
-    if (incoming && incoming.length > 0) {
-      const requesterIds = incoming.map((r) => r.user_id);
-      const { data: requesterProfiles } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", requesterIds);
+    if (!incomingErr) {
+      if (incoming && incoming.length > 0) {
+        const requesterIds = incoming.map((r) => r.user_id);
+        const { data: requesterProfiles } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", requesterIds);
 
-      setPendingRequests(
-        incoming.map((r) => ({
-          ...r,
-          is_muted: r.is_muted ?? false,
-          requester: (requesterProfiles || []).find((p) => p.id === r.user_id) as Profile | undefined,
-        }))
-      );
-    } else {
-      setPendingRequests([]);
+        setPendingRequests(
+          incoming.map((r) => ({
+            ...r,
+            is_muted: r.is_muted ?? false,
+            requester: (requesterProfiles || []).find((p) => p.id === r.user_id) as Profile | undefined,
+          }))
+        );
+      } else {
+        setPendingRequests([]);
+      }
     }
 
     // Pending outgoing requests sent by current user
-    const { data: outgoing } = await supabase
+    const { data: outgoing, error: outgoingErr } = await supabase
       .from("friendships")
       .select("*")
       .eq("user_id", user.id)
       .eq("status", "pending");
 
-    if (outgoing && outgoing.length > 0) {
-      const recipientIds = outgoing.map((r) => r.friend_id);
-      const { data: recipientProfiles } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", recipientIds);
-      setOutgoingRequests(
-        outgoing.map((r) => ({
-          ...r,
-          is_muted: r.is_muted ?? false,
-          recipient: (recipientProfiles || []).find((p) => p.id === r.friend_id) as Profile | undefined,
-        }))
-      );
-    } else {
-      setOutgoingRequests([]);
+    if (!outgoingErr) {
+      if (outgoing && outgoing.length > 0) {
+        const recipientIds = outgoing.map((r) => r.friend_id);
+        const { data: recipientProfiles } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("id", recipientIds);
+        setOutgoingRequests(
+          outgoing.map((r) => ({
+            ...r,
+            is_muted: r.is_muted ?? false,
+            recipient: (recipientProfiles || []).find((p) => p.id === r.friend_id) as Profile | undefined,
+          }))
+        );
+      } else {
+        setOutgoingRequests([]);
+      }
     }
 
     setLoading(false);

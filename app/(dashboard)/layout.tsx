@@ -156,10 +156,11 @@ export default function DashboardLayout({
     const handleForeground = async () => {
       // Refresh the session first in case the token expired while backgrounded,
       // then re-fetch the profile so queries don't fail with auth errors.
+      // Await fetchProfile so the session is confirmed fresh before pages re-query.
       try { await supabase.auth.refreshSession(); } catch {}
-      fetchProfile();
+      await fetchProfile();
       clearNotificationBadge();
-      // Bump refreshKey so pages re-run their data fetches
+      // Bump refreshKey only after fetchProfile completes — pages will have a valid session
       setRefreshKey((k) => k + 1);
     };
 
