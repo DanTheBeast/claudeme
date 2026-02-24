@@ -127,10 +127,17 @@ export default function ProfilePage() {
   const [confirmLogout, setConfirmLogout] = useState(false);
 
   const handleLogout = async () => {
-    // signOut triggers onAuthStateChange in the layout which sets authed=false,
-    // rendering <AuthPage /> directly — no need for an additional router.push
-    // (which would cause a double-navigation flicker).
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {}
+    // Clear all Supabase session keys from localStorage so the next
+    // load starts completely unauthenticated regardless of signOut result.
+    try {
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("sb-"))
+        .forEach((k) => localStorage.removeItem(k));
+    } catch {}
+    window.location.href = "/";
   };
 
   if (!user) return null;

@@ -257,6 +257,7 @@ export default function AuthPage() {
                         onChange={(e) => setDisplayName(e.target.value)}
                         placeholder="Your name"
                         required
+                        autoComplete="name"
                         className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all bg-gray-50/50 focus:bg-white"
                       />
                     </div>
@@ -274,6 +275,7 @@ export default function AuthPage() {
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="you@example.com"
                         required
+                        autoComplete="email"
                         className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all bg-gray-50/50 focus:bg-white"
                       />
                     </div>
@@ -306,6 +308,7 @@ export default function AuthPage() {
                           placeholder={mode === "signup" ? "Min 6 characters" : "Your password"}
                           required
                           minLength={6}
+                          autoComplete={mode === "signup" ? "new-password" : "current-password"}
                           className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all bg-gray-50/50 focus:bg-white pr-10"
                         />
                         <button
