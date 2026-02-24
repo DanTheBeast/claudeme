@@ -139,22 +139,12 @@ Deno.serve(async (req) => {
     // Check which friends have notifications enabled
     const { data: friendProfiles } = await supabase
       .from("profiles")
-      .select("id, notify_availability_changes, enable_push_notifications, enable_quiet_hours, timezone")
+      .select("id, notify_availability_changes, enable_push_notifications")
       .in("id", friendIds);
 
     const notifySet = new Set(
       (friendProfiles ?? [])
-        .filter((p) => {
-          if (!p.enable_push_notifications || !p.notify_availability_changes) return false;
-          if (p.enable_quiet_hours) {
-            // Check if it's currently between 10pm–8am in the recipient's timezone
-            const tz = p.timezone || "UTC";
-            const localHour = new Date().toLocaleString("en-US", { timeZone: tz, hour: "numeric", hour12: false });
-            const h = parseInt(localHour);
-            if (h >= 22 || h < 8) return false;
-          }
-          return true;
-        })
+        .filter((p) => p.enable_push_notifications && p.notify_availability_changes)
         .map((p) => p.id)
     );
 

@@ -22,6 +22,7 @@ import {
   Lightbulb,
   Volume2,
 } from "lucide-react";
+// Clock is kept for Availability Alerts toggle
 export default function ProfilePage() {
   const { user, refreshUser, toast } = useApp();
   const supabase = createClient();
@@ -176,12 +177,6 @@ export default function ProfilePage() {
       key: "notify_availability_changes",
       title: "Availability Alerts",
       desc: "When friends become available",
-      icon: Clock,
-    },
-    {
-      key: "enable_quiet_hours",
-      title: "Quiet Hours (10pm–8am)",
-      desc: "Silence late-night notifications",
       icon: Clock,
     },
   ];
