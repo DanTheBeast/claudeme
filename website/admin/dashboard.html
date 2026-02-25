@@ -434,7 +434,7 @@
     .activity-card .name { font-size: 14px; font-weight: 600; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .activity-card .meta { font-size: 12px; color: var(--gray-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* ── Chart bar ── */
+    /* ── Charts ── */
     .chart-wrap {
       background: var(--white);
       border: 1px solid var(--gray-200);
@@ -443,42 +443,68 @@
       margin-bottom: 28px;
     }
 
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .chart-title {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
       color: var(--gray-800);
-      margin-bottom: 18px;
     }
 
-    .bar-chart {
+    .range-toggle {
       display: flex;
-      align-items: flex-end;
-      gap: 6px;
-      height: 80px;
+      background: var(--gray-100);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
     }
 
-    .bar-col {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      min-width: 0;
+    .range-btn {
+      background: none;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-500);
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+      white-space: nowrap;
     }
 
-    .bar {
+    .range-btn:hover { color: var(--gray-800); }
+    .range-btn.active { background: var(--white); color: var(--gray-900); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+    .line-chart-wrap {
+      position: relative;
       width: 100%;
-      background: linear-gradient(to top, var(--orange-dark), var(--orange-light));
-      border-radius: 4px 4px 0 0;
-      min-height: 2px;
-      transition: height 0.4s ease;
     }
 
-    .bar-day {
-      font-size: 9px;
+    .line-chart-svg {
+      width: 100%;
+      height: 100px;
+      overflow: visible;
+    }
+
+    .chart-x-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      padding: 0 2px;
+    }
+
+    .chart-x-label {
+      font-size: 10px;
       color: var(--gray-400);
       text-align: center;
-      overflow: hidden;
     }
 
     /* ── Loading / empty states ── */
@@ -667,9 +693,40 @@
         <div class="stats-grid" id="metrics-grid">
           <div class="loading"><div class="spinner"></div> Loading…</div>
         </div>
-        <div class="chart-wrap" id="chart-section" style="display:none;">
-          <div class="chart-title">Sign-ups — last 30 days</div>
-          <div class="bar-chart" id="bar-chart"></div>
+        <!-- Sign-ups chart -->
+        <div class="chart-wrap">
+          <div class="chart-header">
+            <div class="chart-title" id="signup-chart-title">Sign-ups</div>
+            <div class="range-toggle" id="signup-range-toggle">
+              <button class="range-btn" data-range="1">Day</button>
+              <button class="range-btn" data-range="7">Week</button>
+              <button class="range-btn active" data-range="30">Month</button>
+              <button class="range-btn" data-range="365">Year</button>
+              <button class="range-btn" data-range="all">All time</button>
+            </div>
+          </div>
+          <div class="line-chart-wrap">
+            <svg class="line-chart-svg" id="signup-chart-svg"></svg>
+          </div>
+          <div class="chart-x-labels" id="signup-chart-labels"></div>
+        </div>
+
+        <!-- Availability events chart -->
+        <div class="chart-wrap">
+          <div class="chart-header">
+            <div class="chart-title" id="avail-chart-title">Times gone available</div>
+            <div class="range-toggle" id="avail-range-toggle">
+              <button class="range-btn" data-range="1">Day</button>
+              <button class="range-btn active" data-range="7">Week</button>
+              <button class="range-btn" data-range="30">Month</button>
+              <button class="range-btn" data-range="365">Year</button>
+              <button class="range-btn" data-range="all">All time</button>
+            </div>
+          </div>
+          <div class="line-chart-wrap">
+            <svg class="line-chart-svg" id="avail-chart-svg"></svg>
+          </div>
+          <div class="chart-x-labels" id="avail-chart-labels"></div>
         </div>
         <div class="section-head"><h2>Newest members</h2></div>
         <div class="table-wrap">
@@ -864,24 +921,134 @@
 
     function invalidate(key) { delete cache[key]; }
 
+    // ── Line chart renderer ───────────────────────────────────────────────────
+    // byDay: { "YYYY-MM-DD": count, … }
+    // range: number of days back, or "all"
+    function renderLineChart(svgId, labelsId, byDay, range) {
+      const svg = document.getElementById(svgId);
+      const labelsEl = document.getElementById(labelsId);
+      svg.innerHTML = '';
+      labelsEl.innerHTML = '';
+
+      // Build ordered day array
+      let days = [];
+      if (range === 'all') {
+        const allKeys = Object.keys(byDay).sort();
+        if (allKeys.length === 0) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9CA3AF" font-size="12" font-family="DM Sans,sans-serif">No data yet</text>'; return; }
+        // Fill from first event to today
+        const first = new Date(allKeys[0] + 'T12:00:00');
+        const today = new Date(); today.setHours(12,0,0,0);
+        for (let d = new Date(first); d <= today; d.setDate(d.getDate() + 1)) {
+          days.push(d.toISOString().slice(0,10));
+        }
+      } else {
+        const n = parseInt(range, 10);
+        for (let i = n - 1; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 86400000);
+          days.push(d.toISOString().slice(0,10));
+        }
+      }
+
+      if (days.length === 0) { svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="#9CA3AF" font-size="12" font-family="DM Sans,sans-serif">No data yet</text>'; return; }
+
+      const counts = days.map(d => byDay[d] || 0);
+      const maxVal = Math.max(...counts, 1);
+
+      const W = 1000, H = 90, PAD_LEFT = 4, PAD_RIGHT = 4, PAD_TOP = 10, PAD_BOTTOM = 10;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+      const xs = days.map((_, i) => PAD_LEFT + (i / Math.max(days.length - 1, 1)) * (W - PAD_LEFT - PAD_RIGHT));
+      const ys = counts.map(c => PAD_TOP + (1 - c / maxVal) * (H - PAD_TOP - PAD_BOTTOM));
+
+      // Area fill
+      const areaPoints = [`${xs[0]},${H - PAD_BOTTOM}`, ...xs.map((x, i) => `${x},${ys[i]}`), `${xs[xs.length-1]},${H - PAD_BOTTOM}`].join(' ');
+      const area = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      area.setAttribute('points', areaPoints);
+      area.setAttribute('fill', 'rgba(212,107,80,0.08)');
+      svg.appendChild(area);
+
+      // Baseline
+      const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      baseline.setAttribute('x1', PAD_LEFT); baseline.setAttribute('y1', H - PAD_BOTTOM);
+      baseline.setAttribute('x2', W - PAD_RIGHT); baseline.setAttribute('y2', H - PAD_BOTTOM);
+      baseline.setAttribute('stroke', '#E5E7EB'); baseline.setAttribute('stroke-width', '1');
+      svg.appendChild(baseline);
+
+      // Line path
+      if (days.length > 1) {
+        const d = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x},${ys[i]}`).join(' ');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('stroke', '#D46B50');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(path);
+      }
+
+      // Dots + tooltips
+      xs.forEach((x, i) => {
+        if (counts[i] === 0 && days.length > 14) return; // skip zero dots in dense views
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', x); circle.setAttribute('cy', ys[i]);
+        circle.setAttribute('r', days.length > 60 ? '2' : '3.5');
+        circle.setAttribute('fill', '#D46B50');
+        circle.setAttribute('stroke', 'white'); circle.setAttribute('stroke-width', '1.5');
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${days[i]}: ${counts[i]}`;
+        circle.appendChild(title);
+        svg.appendChild(circle);
+      });
+
+      // X-axis labels — show a sensible number
+      const maxLabels = Math.min(days.length, days.length > 60 ? 12 : days.length > 14 ? 8 : days.length);
+      const step = Math.max(1, Math.floor(days.length / maxLabels));
+      const labelIndices = [];
+      for (let i = 0; i < days.length; i += step) labelIndices.push(i);
+      if (labelIndices[labelIndices.length - 1] !== days.length - 1) labelIndices.push(days.length - 1);
+
+      labelsEl.style.position = 'relative';
+      for (const idx of labelIndices) {
+        const pct = days.length === 1 ? 0 : (idx / (days.length - 1)) * 100;
+        const d = new Date(days[idx] + 'T12:00:00');
+        const label = d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+        const span = document.createElement('span');
+        span.className = 'chart-x-label';
+        span.textContent = label;
+        span.style.position = 'absolute';
+        span.style.left = pct + '%';
+        span.style.transform = 'translateX(-50%)';
+        labelsEl.appendChild(span);
+      }
+      labelsEl.style.height = '16px';
+    }
+
     // ── METRICS TAB ──────────────────────────────────────────────────────────
-    async function loadMetrics() {
-      const data = await fetchData('metrics', '/api/admin-metrics');
+    let signupRange = '30';
+    let availRange  = '7';
+    let metricsData = null;
+
+    async function loadMetrics(forceRefresh) {
+      if (forceRefresh) invalidate('metrics_' + signupRange + '_' + availRange);
+      const url = `/api/admin-metrics?signupRange=${signupRange}&availRange=${availRange}`;
+      const data = await fetchData('metrics_' + signupRange + '_' + availRange, url);
       if (!data) return;
+      metricsData = data;
 
       const grid = document.getElementById('metrics-grid');
       grid.innerHTML = '';
 
       const cards = [
-        { label: 'Total users',        value: data.totalUsers,        cls: 'accent', sub: 'all time' },
-        { label: 'Available now',       value: data.availableNow,      cls: 'green',  sub: 'right now' },
-        { label: 'Gone available today', value: data.availableToday,   cls: 'green',  sub: 'since midnight' },
-        { label: 'Active this week',    value: data.activeUsers7d,     cls: '',       sub: 'last 7 days' },
-        { label: 'Friendships',         value: data.totalFriendships,  cls: '',       sub: 'accepted' },
-        { label: 'Pending requests',    value: data.pendingRequests,   cls: '',       sub: 'awaiting accept' },
-        { label: 'Push enabled',        value: data.pushEnabled,       cls: '',       sub: 'users' },
-        { label: 'Have friends',        value: data.usersWithFriends,  cls: '',       sub: 'at least 1' },
-        { label: 'Friendless users',    value: (data.totalUsers || 0) - (data.usersWithFriends || 0), cls: '', sub: 'no friends yet' },
+        { label: 'Total users',          value: data.totalUsers,        cls: 'accent', sub: 'all time' },
+        { label: 'Available now',         value: data.availableNow,      cls: 'green',  sub: 'right now' },
+        { label: 'Gone available today',  value: data.availableToday,    cls: 'green',  sub: 'since midnight' },
+        { label: 'Active this week',      value: data.activeUsers7d,     cls: '',       sub: 'last 7 days' },
+        { label: 'Friendships',           value: data.totalFriendships,  cls: '',       sub: 'accepted' },
+        { label: 'Pending requests',      value: data.pendingRequests,   cls: '',       sub: 'awaiting accept' },
+        { label: 'Push enabled',          value: data.pushEnabled,       cls: '',       sub: 'users' },
+        { label: 'Have friends',          value: data.usersWithFriends,  cls: '',       sub: 'at least 1' },
+        { label: 'Friendless users',      value: (data.totalUsers || 0) - (data.usersWithFriends || 0), cls: '', sub: 'no friends yet' },
       ];
 
       for (const c of cards) {
@@ -895,31 +1062,8 @@
         grid.appendChild(el);
       }
 
-      // Bar chart
-      const chartSection = document.getElementById('chart-section');
-      const byDay = data.signupsByDay || {};
-      const days = Object.keys(byDay).sort();
-      if (days.length > 0) {
-        chartSection.style.display = '';
-        const max = Math.max(...Object.values(byDay), 1);
-        const barChart = document.getElementById('bar-chart');
-        barChart.innerHTML = '';
-        // Show last 30 days
-        const allDays = [];
-        for (let i = 29; i >= 0; i--) {
-          const d = new Date(Date.now() - i * 86400000);
-          allDays.push(d.toISOString().slice(0, 10));
-        }
-        for (const day of allDays) {
-          const count = byDay[day] || 0;
-          const pct = Math.max((count / max) * 100, count > 0 ? 4 : 1);
-          const col = document.createElement('div');
-          col.className = 'bar-col';
-          const shortDay = new Date(day + 'T12:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
-          col.innerHTML = `<div class="bar" style="height:${pct}%" title="${count} sign-up${count !== 1 ? 's' : ''} on ${day}"></div><div class="bar-day">${shortDay.split('/').slice(0,2).join('/')}</div>`;
-          barChart.appendChild(col);
-        }
-      }
+      renderLineChart('signup-chart-svg', 'signup-chart-labels', data.signupsByDay || {}, signupRange);
+      renderLineChart('avail-chart-svg',  'avail-chart-labels',  data.availByDay   || {}, availRange);
 
       // Recent users
       const tbody = document.getElementById('recent-users-tbody');
@@ -939,12 +1083,30 @@
           <td>${formatDate(u.created_at)}</td>
           <td>—</td>
         `;
-        // Prepend avatar
         const cell = tr.querySelector('.user-cell');
         cell.insertBefore(avatarEl(u), cell.firstChild);
         tbody.appendChild(tr);
       }
     }
+
+    // Range toggle wiring
+    document.getElementById('signup-range-toggle').addEventListener('click', async e => {
+      const btn = e.target.closest('.range-btn');
+      if (!btn) return;
+      document.querySelectorAll('#signup-range-toggle .range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      signupRange = btn.dataset.range;
+      await loadMetrics(true);
+    });
+
+    document.getElementById('avail-range-toggle').addEventListener('click', async e => {
+      const btn = e.target.closest('.range-btn');
+      if (!btn) return;
+      document.querySelectorAll('#avail-range-toggle .range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      availRange = btn.dataset.range;
+      await loadMetrics(true);
+    });
 
     // ── USERS TAB ────────────────────────────────────────────────────────────
     let allUsers = [];
@@ -1129,7 +1291,7 @@
 
     // ── Tab loader ────────────────────────────────────────────────────────────
     function loadTab(tab) {
-      if (tab === 'metrics') loadMetrics();
+      if (tab === 'metrics') loadMetrics(false);
       else if (tab === 'users') loadUsers();
       else if (tab === 'activity') loadActivity();
     }
