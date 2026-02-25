@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CallMe Admin</title>
+  <link rel="icon" href="/logo.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange: #D46B50;
+      --orange-light: #DE7F65;
+      --orange-dark: #C05840;
+      --orange-50: #FDF3F0;
+      --orange-100: #FADED8;
+      --green: #10B981;
+      --green-50: #ECFDF5;
+      --red: #EF4444;
+      --red-50: #FEF2F2;
+      --gray-900: #111827;
+      --gray-800: #1F2937;
+      --gray-700: #374151;
+      --gray-600: #4B5563;
+      --gray-500: #6B7280;
+      --gray-400: #9CA3AF;
+      --gray-300: #D1D5DB;
+      --gray-200: #E5E7EB;
+      --gray-100: #F3F4F6;
+      --gray-50: #F9FAFB;
+      --white: #FFFFFF;
+      --bg: #FDFBF9;
+      --sidebar-w: 220px;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--gray-900);
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--gray-200);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .topbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      text-decoration: none;
+      color: var(--gray-900);
+    }
+
+    .topbar-logo img { width: 28px; height: 28px; border-radius: 8px; }
+
+    .topbar-logo .wordmark {
+      font-family: 'Fraunces', serif;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .topbar-badge {
+      background: var(--orange-50);
+      border: 1px solid var(--orange-100);
+      color: var(--orange-dark);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 100px;
+    }
+
+    .topbar-spacer { flex: 1; }
+
+    .topbar-logout {
+      background: none;
+      border: 1px solid var(--gray-300);
+      color: var(--gray-600);
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .topbar-logout:hover { border-color: var(--orange); color: var(--orange-dark); }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      padding-top: 56px;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      position: fixed;
+      top: 56px;
+      left: 0;
+      bottom: 0;
+      background: var(--white);
+      border-right: 1px solid var(--gray-200);
+      padding: 20px 12px;
+      overflow-y: auto;
+    }
+
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      padding: 0 8px;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+
+    .nav-section-label:first-child { margin-top: 0; }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--gray-600);
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+      text-decoration: none;
+      user-select: none;
+      margin-bottom: 2px;
+    }
+
+    .nav-item:hover { background: var(--gray-100); color: var(--gray-900); }
+
+    .nav-item.active {
+      background: var(--orange-50);
+      color: var(--orange-dark);
+      font-weight: 600;
+    }
+
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.8; }
+    .nav-item.active svg { opacity: 1; }
+
+    /* ── Main content ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      padding: 32px 32px 64px;
+      max-width: 1100px;
+    }
+
+    /* ── Page header ── */
+    .page-header {
+      margin-bottom: 28px;
+    }
+
+    .page-title {
+      font-family: 'Fraunces', serif;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--gray-500);
+    }
+
+    /* ── Tab panel ── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fade-in 0.25s ease both; }
+
+    @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Stat cards ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 16px;
+      padding: 20px 22px;
+      transition: box-shadow 0.2s;
+    }
+
+    .stat-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+
+    .stat-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-family: 'Fraunces', serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      color: var(--gray-900);
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--gray-400);
+      margin-top: 6px;
+    }
+
+    .stat-card.accent { background: linear-gradient(135deg, var(--orange-50), #fff5f2); border-color: var(--orange-100); }
+    .stat-card.accent .stat-value { color: var(--orange-dark); }
+    .stat-card.green { background: var(--green-50); border-color: #BBF7D0; }
+    .stat-card.green .stat-value { color: #059669; }
+
+    /* ── Section heading ── */
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .section-head h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--gray-800);
+    }
+
+    .section-head .count-pill {
+      background: var(--gray-100);
+      color: var(--gray-600);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 28px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: var(--gray-50);
+      padding: 11px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--gray-500);
+      border-bottom: 1px solid var(--gray-200);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--gray-100);
+      transition: background 0.1s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--gray-50); }
+
+    td { padding: 12px 16px; vertical-align: middle; color: var(--gray-700); }
+
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--orange-light), var(--orange-dark));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .user-name { font-weight: 600; color: var(--gray-900); font-size: 14px; }
+    .user-email { font-size: 12px; color: var(--gray-400); }
+
+    .badge-avail {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--green-50);
+      color: #059669;
+      border: 1px solid #BBF7D0;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 100px;
+    }
+
+    .badge-avail .dot {
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .badge-offline {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--gray-100);
+      color: var(--gray-500);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 100px;
+    }
+
+    .btn-danger {
+      background: none;
+      border: 1px solid #FECACA;
+      color: var(--red);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      padding: 5px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .btn-danger:hover { background: var(--red-50); border-color: var(--red); }
+
+    /* ── Search ── */
+    .search-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .search-input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--white);
+      color: var(--gray-900);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .search-input:focus { border-color: var(--orange); }
+    .search-input::placeholder { color: var(--gray-400); }
+
+    /* ── Activity cards ── */
+    .activity-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .activity-card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: box-shadow 0.15s;
+    }
+
+    .activity-card:hover { box-shadow: 0 3px 14px rgba(0,0,0,0.06); }
+
+    .activity-card .info { flex: 1; min-width: 0; }
+    .activity-card .name { font-size: 14px; font-weight: 600; color: var(--gray-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .activity-card .meta { font-size: 12px; color: var(--gray-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Chart bar ── */
+    .chart-wrap {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 16px;
+      padding: 22px 24px;
+      margin-bottom: 28px;
+    }
+
+    .chart-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gray-800);
+      margin-bottom: 18px;
+    }
+
+    .bar-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 80px;
+    }
+
+    .bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .bar {
+      width: 100%;
+      background: linear-gradient(to top, var(--orange-dark), var(--orange-light));
+      border-radius: 4px 4px 0 0;
+      min-height: 2px;
+      transition: height 0.4s ease;
+    }
+
+    .bar-day {
+      font-size: 9px;
+      color: var(--gray-400);
+      text-align: center;
+      overflow: hidden;
+    }
+
+    /* ── Loading / empty states ── */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px;
+      color: var(--gray-400);
+      font-size: 14px;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--gray-200);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: var(--gray-400);
+      font-size: 14px;
+    }
+
+    /* ── Confirm modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 32px 28px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      transform: scale(0.96);
+      transition: transform 0.2s;
+    }
+
+    .modal-overlay.open .modal { transform: scale(1); }
+
+    .modal h3 {
+      font-family: 'Fraunces', serif;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .modal p {
+      font-size: 14px;
+      color: var(--gray-500);
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-cancel {
+      flex: 1;
+      padding: 11px;
+      background: none;
+      border: 1.5px solid var(--gray-300);
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--gray-700);
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    .btn-cancel:hover { background: var(--gray-100); }
+
+    .btn-confirm-delete {
+      flex: 1;
+      padding: 11px;
+      background: var(--red);
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: 'DM Sans', sans-serif;
+      color: white;
+      cursor: pointer;
+      transition: opacity 0.12s;
+    }
+
+    .btn-confirm-delete:hover { opacity: 0.88; }
+    .btn-confirm-delete:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--gray-900);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 300;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    .toast.visible {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      :root { --sidebar-w: 0px; }
+      .sidebar { display: none; }
+      .main { margin-left: 0; padding: 20px 16px 80px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <a href="/" class="topbar-logo">
+      <img src="/logo.png" alt="CallMe" />
+      <span class="wordmark">CallMe</span>
+    </a>
+    <span class="topbar-badge">Admin</span>
+    <div class="topbar-spacer"></div>
+    <button class="topbar-logout" id="logout-btn">Sign out</button>
+  </div>
+
+  <div class="layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="nav-section-label">Dashboard</div>
+      <div class="nav-item active" data-tab="metrics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Metrics
+      </div>
+      <div class="nav-item" data-tab="users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
+      </div>
+      <div class="nav-item" data-tab="activity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Activity
+      </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main">
+
+      <!-- METRICS TAB -->
+      <div class="tab-panel active" id="tab-metrics">
+        <div class="page-header">
+          <div class="page-title">Overview</div>
+          <div class="page-subtitle">Key stats at a glance.</div>
+        </div>
+        <div class="stats-grid" id="metrics-grid">
+          <div class="loading"><div class="spinner"></div> Loading…</div>
+        </div>
+        <div class="chart-wrap" id="chart-section" style="display:none;">
+          <div class="chart-title">Sign-ups — last 30 days</div>
+          <div class="bar-chart" id="bar-chart"></div>
+        </div>
+        <div class="section-head"><h2>Newest members</h2></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Joined</th>
+                <th>Friends</th>
+              </tr>
+            </thead>
+            <tbody id="recent-users-tbody">
+              <tr><td colspan="3" class="loading"><div class="spinner"></div> Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- USERS TAB -->
+      <div class="tab-panel" id="tab-users">
+        <div class="page-header">
+          <div class="page-title">Users</div>
+          <div class="page-subtitle">All registered accounts.</div>
+        </div>
+        <div class="search-row">
+          <input class="search-input" id="user-search" placeholder="Search by name or email…" />
+        </div>
+        <div class="section-head">
+          <h2>All users</h2>
+          <span class="count-pill" id="user-count">—</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Status</th>
+                <th>Friends</th>
+                <th>Push</th>
+                <th>Joined</th>
+                <th>Last seen</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="7" class="loading"><div class="spinner"></div> Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ACTIVITY TAB -->
+      <div class="tab-panel" id="tab-activity">
+        <div class="page-header">
+          <div class="page-title">Activity</div>
+          <div class="page-subtitle">Who's available right now, recent sign-ups, and pending friend requests.</div>
+        </div>
+
+        <div class="section-head">
+          <h2>Available right now</h2>
+          <span class="count-pill" id="avail-count">—</span>
+        </div>
+        <div id="available-section" class="activity-grid">
+          <div class="loading"><div class="spinner"></div> Loading…</div>
+        </div>
+
+        <div class="section-head">
+          <h2>Signed up this week</h2>
+          <span class="count-pill" id="signup-count">—</span>
+        </div>
+        <div id="signups-section" class="activity-grid">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+
+        <div class="section-head">
+          <h2>Pending friend requests</h2>
+          <span class="count-pill" id="pending-count">—</span>
+        </div>
+        <div id="pending-section" class="activity-grid">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div class="modal-overlay" id="delete-modal">
+    <div class="modal">
+      <h3>Delete account?</h3>
+      <p id="delete-modal-body">This will permanently delete the user and all their data. This cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="modal-cancel">Cancel</button>
+        <button class="btn-confirm-delete" id="modal-confirm">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── Auth guard ──────────────────────────────────────────────────────────
+    async function checkAuth() {
+      const res = await fetch('/api/admin-check');
+      if (!res.ok) {
+        window.location.href = '/admin/';
+      }
+    }
+
+    // ── Logout ──────────────────────────────────────────────────────────────
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/api/admin-logout', { method: 'POST' });
+      window.location.href = '/admin/';
+    });
+
+    // ── Tab switching ────────────────────────────────────────────────────────
+    const navItems = document.querySelectorAll('.nav-item[data-tab]');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+    let activeTab = 'metrics';
+
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const tab = item.dataset.tab;
+        navItems.forEach(n => n.classList.remove('active'));
+        tabPanels.forEach(p => p.classList.remove('active'));
+        item.classList.add('active');
+        document.getElementById('tab-' + tab).classList.add('active');
+        activeTab = tab;
+        loadTab(tab);
+      });
+    });
+
+    // ── Toast ────────────────────────────────────────────────────────────────
+    let toastTimer;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('visible'), 3000);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function timeAgo(iso) {
+      const diff = Date.now() - new Date(iso).getTime();
+      const m = Math.floor(diff / 60000);
+      if (m < 1)  return 'just now';
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ago';
+      const d = Math.floor(h / 24);
+      if (d < 30) return d + 'd ago';
+      const mo = Math.floor(d / 30);
+      return mo + 'mo ago';
+    }
+
+    function formatDate(iso) {
+      return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function initials(name) {
+      return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+    }
+
+    function avatarEl(user) {
+      const el = document.createElement('div');
+      el.className = 'avatar';
+      if (user.profile_picture) {
+        const img = document.createElement('img');
+        img.src = user.profile_picture;
+        img.alt = user.display_name;
+        img.onerror = () => { el.textContent = initials(user.display_name || '?'); };
+        el.appendChild(img);
+      } else {
+        el.textContent = initials(user.display_name || '?');
+      }
+      return el;
+    }
+
+    // ── Data cache ───────────────────────────────────────────────────────────
+    const cache = {};
+
+    async function fetchData(key, url) {
+      if (cache[key]) return cache[key];
+      const res = await fetch(url);
+      if (res.status === 401) { window.location.href = '/admin/'; return null; }
+      const data = await res.json();
+      cache[key] = data;
+      return data;
+    }
+
+    function invalidate(key) { delete cache[key]; }
+
+    // ── METRICS TAB ──────────────────────────────────────────────────────────
+    async function loadMetrics() {
+      const data = await fetchData('metrics', '/api/admin-metrics');
+      if (!data) return;
+
+      const grid = document.getElementById('metrics-grid');
+      grid.innerHTML = '';
+
+      const cards = [
+        { label: 'Total users',        value: data.totalUsers,        cls: 'accent', sub: 'all time' },
+        { label: 'Available now',       value: data.availableNow,      cls: 'green',  sub: 'right now' },
+        { label: 'Active this week',    value: data.activeUsers7d,     cls: '',       sub: 'last 7 days' },
+        { label: 'Friendships',         value: data.totalFriendships,  cls: '',       sub: 'accepted' },
+        { label: 'Pending requests',    value: data.pendingRequests,   cls: '',       sub: 'awaiting accept' },
+        { label: 'Push enabled',        value: data.pushEnabled,       cls: '',       sub: 'users' },
+        { label: 'Have friends',        value: data.usersWithFriends,  cls: '',       sub: 'at least 1' },
+        { label: 'Friendless users',    value: (data.totalUsers || 0) - (data.usersWithFriends || 0), cls: '', sub: 'no friends yet' },
+      ];
+
+      for (const c of cards) {
+        const el = document.createElement('div');
+        el.className = 'stat-card ' + c.cls;
+        el.innerHTML = `
+          <div class="stat-label">${c.label}</div>
+          <div class="stat-value">${c.value ?? '—'}</div>
+          <div class="stat-sub">${c.sub}</div>
+        `;
+        grid.appendChild(el);
+      }
+
+      // Bar chart
+      const chartSection = document.getElementById('chart-section');
+      const byDay = data.signupsByDay || {};
+      const days = Object.keys(byDay).sort();
+      if (days.length > 0) {
+        chartSection.style.display = '';
+        const max = Math.max(...Object.values(byDay), 1);
+        const barChart = document.getElementById('bar-chart');
+        barChart.innerHTML = '';
+        // Show last 30 days
+        const allDays = [];
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(Date.now() - i * 86400000);
+          allDays.push(d.toISOString().slice(0, 10));
+        }
+        for (const day of allDays) {
+          const count = byDay[day] || 0;
+          const pct = Math.max((count / max) * 100, count > 0 ? 4 : 1);
+          const col = document.createElement('div');
+          col.className = 'bar-col';
+          const shortDay = new Date(day + 'T12:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+          col.innerHTML = `<div class="bar" style="height:${pct}%" title="${count} sign-up${count !== 1 ? 's' : ''} on ${day}"></div><div class="bar-day">${shortDay.split('/').slice(0,2).join('/')}</div>`;
+          barChart.appendChild(col);
+        }
+      }
+
+      // Recent users
+      const tbody = document.getElementById('recent-users-tbody');
+      tbody.innerHTML = '';
+      if (!data.recentUsers || data.recentUsers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No users yet.</td></tr>';
+        return;
+      }
+      for (const u of data.recentUsers) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>
+            <div class="user-cell">
+              <div class="user-name">${esc(u.display_name)}</div>
+            </div>
+          </td>
+          <td>${formatDate(u.created_at)}</td>
+          <td>—</td>
+        `;
+        // Prepend avatar
+        const cell = tr.querySelector('.user-cell');
+        cell.insertBefore(avatarEl(u), cell.firstChild);
+        tbody.appendChild(tr);
+      }
+    }
+
+    // ── USERS TAB ────────────────────────────────────────────────────────────
+    let allUsers = [];
+    let deleteTargetId = null;
+    let deleteTargetName = null;
+
+    async function loadUsers() {
+      const data = await fetchData('users', '/api/admin-users');
+      if (!data) return;
+      allUsers = data.users || [];
+      renderUsers(allUsers);
+    }
+
+    function renderUsers(users) {
+      const tbody = document.getElementById('users-tbody');
+      const countPill = document.getElementById('user-count');
+      countPill.textContent = users.length;
+      tbody.innerHTML = '';
+      if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No users found.</td></tr>';
+        return;
+      }
+      for (const u of users) {
+        const tr = document.createElement('tr');
+        const statusBadge = u.is_available
+          ? `<span class="badge-avail"><span class="dot"></span>Available</span>`
+          : `<span class="badge-offline">Offline</span>`;
+
+        tr.innerHTML = `
+          <td>
+            <div class="user-cell">
+              <div>
+                <div class="user-name">${esc(u.display_name)}</div>
+                <div class="user-email">${esc(u.email)}</div>
+              </div>
+            </div>
+          </td>
+          <td>${statusBadge}</td>
+          <td>${u.friend_count}</td>
+          <td>${u.enable_push_notifications ? '✓' : '—'}</td>
+          <td>${formatDate(u.created_at)}</td>
+          <td>${timeAgo(u.last_seen)}</td>
+          <td>
+            <button class="btn-danger" data-id="${u.id}" data-name="${esc(u.display_name)}">Delete</button>
+          </td>
+        `;
+        const cell = tr.querySelector('.user-cell');
+        cell.insertBefore(avatarEl(u), cell.firstChild);
+        tbody.appendChild(tr);
+      }
+
+      tbody.querySelectorAll('.btn-danger').forEach(btn => {
+        btn.addEventListener('click', () => {
+          deleteTargetId = btn.dataset.id;
+          deleteTargetName = btn.dataset.name;
+          document.getElementById('delete-modal-body').textContent =
+            `This will permanently delete "${deleteTargetName}" and all their data. This cannot be undone.`;
+          document.getElementById('delete-modal').classList.add('open');
+        });
+      });
+    }
+
+    // Search filter
+    document.getElementById('user-search').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase();
+      const filtered = allUsers.filter(u =>
+        u.display_name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q)
+      );
+      renderUsers(filtered);
+    });
+
+    // Delete modal
+    document.getElementById('modal-cancel').addEventListener('click', () => {
+      document.getElementById('delete-modal').classList.remove('open');
+    });
+
+    document.getElementById('modal-confirm').addEventListener('click', async () => {
+      const btn = document.getElementById('modal-confirm');
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+      const res = await fetch('/api/admin-users?id=' + deleteTargetId, { method: 'DELETE' });
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+      document.getElementById('delete-modal').classList.remove('open');
+      if (res.ok) {
+        invalidate('users');
+        invalidate('metrics');
+        invalidate('activity');
+        await loadUsers();
+        showToast('User deleted.');
+      } else {
+        const err = await res.json();
+        showToast('Error: ' + (err.error || 'Could not delete user.'));
+      }
+    });
+
+    // Close modal on overlay click
+    document.getElementById('delete-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('delete-modal')) {
+        document.getElementById('delete-modal').classList.remove('open');
+      }
+    });
+
+    // ── ACTIVITY TAB ─────────────────────────────────────────────────────────
+    async function loadActivity() {
+      const data = await fetchData('activity', '/api/admin-activity');
+      if (!data) return;
+
+      // Available now
+      const availSection = document.getElementById('available-section');
+      const availCount = document.getElementById('avail-count');
+      availCount.textContent = data.available.length;
+      availSection.innerHTML = '';
+      if (data.available.length === 0) {
+        availSection.innerHTML = '<div class="empty-state">Nobody available right now.</div>';
+      } else {
+        for (const u of data.available) {
+          const card = document.createElement('div');
+          card.className = 'activity-card';
+          card.innerHTML = `
+            <div class="info">
+              <div class="name">${esc(u.display_name)}</div>
+              <div class="meta">${u.current_mood ? esc(u.current_mood) : 'Available'}</div>
+            </div>
+            <span class="badge-avail"><span class="dot"></span>Free</span>
+          `;
+          card.insertBefore(avatarEl(u), card.firstChild);
+          availSection.appendChild(card);
+        }
+      }
+
+      // Recent sign-ups
+      const signupsSection = document.getElementById('signups-section');
+      const signupCount = document.getElementById('signup-count');
+      signupCount.textContent = data.recentSignups.length;
+      signupsSection.innerHTML = '';
+      if (data.recentSignups.length === 0) {
+        signupsSection.innerHTML = '<div class="empty-state">No sign-ups this week.</div>';
+      } else {
+        for (const u of data.recentSignups) {
+          const card = document.createElement('div');
+          card.className = 'activity-card';
+          card.innerHTML = `
+            <div class="info">
+              <div class="name">${esc(u.display_name)}</div>
+              <div class="meta">${esc(u.email)} &middot; ${timeAgo(u.created_at)}</div>
+            </div>
+          `;
+          card.insertBefore(avatarEl(u), card.firstChild);
+          signupsSection.appendChild(card);
+        }
+      }
+
+      // Pending friend requests
+      const pendingSection = document.getElementById('pending-section');
+      const pendingCount = document.getElementById('pending-count');
+      pendingCount.textContent = data.pendingFriendships.length;
+      pendingSection.innerHTML = '';
+      if (data.pendingFriendships.length === 0) {
+        pendingSection.innerHTML = '<div class="empty-state">No pending requests.</div>';
+      } else {
+        for (const f of data.pendingFriendships) {
+          const card = document.createElement('div');
+          card.className = 'activity-card';
+          card.innerHTML = `
+            <div class="info">
+              <div class="name">${esc(f.from.display_name)} → ${esc(f.to.display_name)}</div>
+              <div class="meta">Sent ${timeAgo(f.created_at)}</div>
+            </div>
+          `;
+          pendingSection.appendChild(card);
+        }
+      }
+    }
+
+    // ── Escape HTML ──────────────────────────────────────────────────────────
+    function esc(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Tab loader ────────────────────────────────────────────────────────────
+    function loadTab(tab) {
+      if (tab === 'metrics') loadMetrics();
+      else if (tab === 'users') loadUsers();
+      else if (tab === 'activity') loadActivity();
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    checkAuth().then(() => loadTab('metrics'));
+  </script>
+</body>
+</html>
