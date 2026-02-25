@@ -26,6 +26,9 @@ export default async function handler(req, res) {
 
   const db = supabase();
 
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
   const [
     { count: totalUsers },
     { count: availableNow },
@@ -33,6 +36,7 @@ export default async function handler(req, res) {
     { count: pendingRequests },
     { data: recentUsers },
     { data: signupsByDay },
+    { count: availableTodayCount },
   ] = await Promise.all([
     db.from('profiles').select('*', { count: 'exact', head: true }),
     db.from('profiles').select('*', { count: 'exact', head: true }).eq('is_available', true),
@@ -47,6 +51,10 @@ export default async function handler(req, res) {
     db.from('profiles')
       .select('created_at')
       .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+    // Times anyone went available today
+    db.from('availability_events')
+      .select('*', { count: 'exact', head: true })
+      .gte('occurred_at', todayStart.toISOString()),
   ]);
 
   // Group sign-ups by day
@@ -87,6 +95,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     totalUsers,
     availableNow,
+    availableToday: availableTodayCount,
     totalFriendships,
     pendingRequests,
     activeUsers7d,

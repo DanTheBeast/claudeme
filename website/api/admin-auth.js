@@ -1,12 +1,20 @@
 // Vercel Serverless Function — POST /api/admin-auth
 // Validates the admin password and sets a session cookie.
 
+export const config = { api: { bodyParser: true } };
+
 export default function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { password } = req.body || {};
+  // Vercel auto-parses JSON bodies; handle string body just in case
+  let body = req.body || {};
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch { body = {}; }
+  }
+
+  const { password } = body;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
   if (!adminPassword) {
