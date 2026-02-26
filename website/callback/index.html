@@ -126,9 +126,7 @@
     <div id="state-success" style="display:none;">
       <img src="/logo.png" alt="CallMe" class="logo" />
       <h2 style="color:#059669;">Password updated!</h2>
-      <p class="sub">Your new password is set. Open CallMe and sign in.</p>
-      <button class="btn" id="open-app-btn" style="margin-bottom:12px;">Open CallMe</button>
-      <p style="font-size:12px;color:#9CA3AF;margin:0;">Not on this device? <a href="https://apps.apple.com/app/just-call-me-app/id6759512338" style="color:#D46B50;text-decoration:none;">Download on the App Store</a></p>
+      <p class="sub">Your new password is set. Just open CallMe on your phone and sign in normally.</p>
     </div>
 
     <!-- Error -->
@@ -260,19 +258,7 @@
       if (e.key === 'Enter') document.getElementById('save-btn').click();
     });
 
-    // Open app — try callme:// custom scheme, fall back to App Store after 1.5s
-    document.getElementById('open-app-btn').addEventListener('click', () => {
-      const appStoreUrl = 'https://apps.apple.com/app/just-call-me-app/id6759512338';
 
-      // Try to open the app via custom URL scheme
-      window.location.href = 'callme://';
-
-      // If app isn't installed, the browser won't navigate away —
-      // fall back to App Store after 1.5s
-      setTimeout(() => {
-        window.location.href = appStoreUrl;
-      }, 1500);
-    });
   </script>
 </body>
 </html>
