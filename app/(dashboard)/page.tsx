@@ -195,10 +195,11 @@ export default function HomePage() {
             .from("profiles")
             .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
             .eq("id", user!.id)
-            .then(() => refreshUser().then(() => {
+            .then(() => {
+              // Realtime subscription will sync context
               setLocalAvailable(null);
               setLocalAvailableUntil(undefined);
-            }));
+            });
         } else {
           setCountdown(formatCountdown(availableUntil));
         }
@@ -234,8 +235,11 @@ export default function HomePage() {
       toast("Failed to update availability — try again");
       return;
     }
-    await refreshUser();
-    // Clear overrides — context is now up to date
+    // Don't call refreshUser() here — the Realtime subscription in the layout
+    // will update the user context when the DB change arrives. Calling refreshUser()
+    // races with the DB write and can overwrite user with stale data if the user
+    // navigates away before it completes.
+    // Clear overrides — Realtime will sync context momentarily
     setLocalAvailable(null);
     setLocalAvailableUntil(undefined);
     toast(minutes ? `You're available for ${DURATIONS.find(d => d.minutes === minutes)?.label}! 📞` : "You're available! 📞");
@@ -259,8 +263,7 @@ export default function HomePage() {
       toast("Failed to update availability — try again");
       return;
     }
-    await refreshUser();
-    // Clear overrides — context is now up to date
+    // Realtime subscription in layout will sync context — no need to refreshUser()
     setLocalAvailable(null);
     setLocalAvailableUntil(undefined);
     toast("You're now unavailable");
