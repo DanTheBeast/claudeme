@@ -127,8 +127,8 @@
       <img src="/logo.png" alt="CallMe" class="logo" />
       <h2 style="color:#059669;">Password updated!</h2>
       <p class="sub">Your new password is set. Open CallMe and sign in.</p>
-      <button class="btn" id="open-app-btn" style="margin-bottom:12px;">Open CallMe</button>
-      <p style="font-size:12px;color:#9CA3AF;margin:0;">Not working? Make sure CallMe is installed on this device.</p>
+      <a href="https://justcallme.app" class="btn" style="display:block;text-decoration:none;margin-bottom:12px;">Open CallMe</a>
+      <p style="font-size:12px;color:#9CA3AF;margin:0;">Not on this device? <a href="https://apps.apple.com/app/just-call-me-app/id6759512338" style="color:#D46B50;text-decoration:none;">Download on the App Store</a></p>
     </div>
 
     <!-- Error -->
@@ -260,22 +260,7 @@
       if (e.key === 'Enter') document.getElementById('save-btn').click();
     });
 
-    // Open app button — try universal link first, fall back to App Store
-    document.getElementById('open-app-btn').addEventListener('click', () => {
-      // justcallme.app is registered as a Universal Link for the app.
-      // iOS will open the app directly if installed; otherwise opens Safari.
-      // We attempt it, then after a short delay fall back to the App Store.
-      const appStoreUrl = 'https://apps.apple.com/app/just-call-me-app/id6759512338';
-      const universalLink = 'https://justcallme.app';
 
-      // Try to open the app via universal link
-      window.location.href = universalLink;
-
-      // If the app isn't installed, iOS won't switch apps — fall back to App Store after 1.5s
-      setTimeout(() => {
-        window.location.href = appStoreUrl;
-      }, 1500);
-    });
   </script>
 </body>
 </html>
