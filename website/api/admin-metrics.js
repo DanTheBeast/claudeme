@@ -29,11 +29,18 @@ function daysAgo(n) {
   return new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
 }
 
-// Group an array of ISO strings by day key "YYYY-MM-DD"
+// Convert a UTC ISO string to a "YYYY-MM-DD" day key in PST (UTC-8, no DST adjustment — Dan is in PST)
+function toPSTDay(isoString) {
+  const PST_OFFSET_MS = 8 * 60 * 60 * 1000; // UTC-8
+  const d = new Date(new Date(isoString).getTime() - PST_OFFSET_MS);
+  return d.toISOString().slice(0, 10);
+}
+
+// Group an array of ISO strings by day key "YYYY-MM-DD" in PST
 function groupByDay(rows, field) {
   const map = {};
   for (const row of rows) {
-    const day = row[field].slice(0, 10);
+    const day = toPSTDay(row[field]);
     map[day] = (map[day] || 0) + 1;
   }
   return map;
@@ -55,8 +62,11 @@ export default async function handler(req, res) {
   const signupCutoff = daysAgo(signupDays);
   const availCutoff  = daysAgo(availDays);
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // Calculate midnight PST (UTC-8). Vercel runs in UTC so we must do this explicitly.
+  const PST_OFFSET_MS = 8 * 60 * 60 * 1000;
+  const nowPST = new Date(Date.now() - PST_OFFSET_MS);
+  const todayPSTStr = nowPST.toISOString().slice(0, 10); // "YYYY-MM-DD" in PST
+  const todayStart = new Date(todayPSTStr + 'T08:00:00.000Z'); // midnight PST = 08:00 UTC
 
   // Core counts (always current)
   const [
