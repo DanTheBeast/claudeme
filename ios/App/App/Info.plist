@@ -68,6 +68,17 @@
 			</array>
 		</dict>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.danfields5454.callme</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>callme</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIRequiresFullScreen</key>
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
