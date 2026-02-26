@@ -24,9 +24,10 @@ export function cacheRead<T>(key: string, userId: string): T | null {
     const raw = localStorage.getItem(PREFIX + key);
     if (!raw) return null;
     const entry = JSON.parse(raw) as CacheEntry<T>;
-    // Reject if wrong user or too old
+    // Reject if wrong user — never reject on age.
+    // Stale cache is always better than a skeleton; the page will
+    // overwrite it immediately after the background fetch completes.
     if (entry.userId !== userId) return null;
-    if (Date.now() - entry.ts > MAX_AGE_MS) return null;
     return entry.data;
   } catch {
     return null;
