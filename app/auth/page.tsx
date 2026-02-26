@@ -52,7 +52,7 @@ export default function AuthPage() {
       password,
       options: {
         data: { display_name: displayName },
-        emailRedirectTo: `${window.location.origin}/callback`,
+        emailRedirectTo: `https://justcallme.app/callback`,
       },
     });
 
@@ -97,7 +97,7 @@ export default function AuthPage() {
     setMessage(null);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/callback`,
+      redirectTo: `https://justcallme.app/callback`,
     });
 
     if (error) {
