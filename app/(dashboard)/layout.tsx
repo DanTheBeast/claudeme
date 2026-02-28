@@ -123,10 +123,17 @@ export default function DashboardLayout({
       }, 1000);
 
     } catch (e) {
-      setAuthed(false);
-      setLoading(false);
-      initialLoadDone.current = true;
-      hideSplash();
+      // Only tear down the dashboard if we were never authenticated.
+      // A transient network error on foreground resume should NOT unmount
+      // the entire app — the user was already logged in; just leave everything
+      // as-is and the Realtime/onAuthStateChange subscription will recover.
+      if (!initialLoadDone.current) {
+        setAuthed(false);
+        setLoading(false);
+        initialLoadDone.current = true;
+        hideSplash();
+      }
+      // If already authenticated (resume scenario), silently ignore the error.
     }
   }, [supabase, hideSplash]);
 
@@ -166,9 +173,10 @@ export default function DashboardLayout({
         try { await supabase.auth.refreshSession(); } catch {}
         await fetchProfile();
         clearNotificationBadge();
-        // Bump refreshKey only after fetchProfile completes — pages will have a valid session
-        setRefreshKey((k) => k + 1);
       } finally {
+        // Always bump refreshKey — even if fetchProfile hit a transient error,
+        // child pages should still retry their own data loads.
+        setRefreshKey((k) => k + 1);
         foregroundBusy.current = false;
       }
     };

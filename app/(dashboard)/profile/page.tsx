@@ -6,8 +6,6 @@ import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
 import { Avatar } from "@/app/_components/avatar";
 import {
-  Edit3,
-  Save,
   LogOut,
   Phone,
   Shield,
@@ -27,10 +25,10 @@ export default function ProfilePage() {
   const { user, refreshUser, toast } = useApp();
   const supabase = createClient();
 
-  const [editing, setEditing] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [avatarBust, setAvatarBust] = useState<string | null>(null);
   const [appSounds, setAppSounds] = useState(() => soundsEnabled());
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState({
     display_name: user?.display_name || "",
@@ -39,9 +37,9 @@ export default function ProfilePage() {
     username: user?.username || "",
   });
 
-  // Re-sync draft if user loads after mount (e.g. slow cold start)
+  // Re-sync draft when user loads after mount (e.g. slow cold start)
   useEffect(() => {
-    if (user && !editing) {
+    if (user) {
       setDraft({
         display_name: user.display_name || "",
         phone_number: user.phone_number || "",
@@ -51,30 +49,33 @@ export default function ProfilePage() {
     }
   }, [user?.id]);
 
-  const save = async () => {
+  // Auto-save on blur — called when any field loses focus
+  const saveField = async (field: string, value: string) => {
     if (!user) return;
-    if (!draft.display_name.trim()) {
+    if (field === "display_name" && !value.trim()) {
       feedbackError();
       toast("Name can't be empty");
+      setDraft((d) => ({ ...d, display_name: user.display_name || "" }));
       return;
     }
+    if (saving) return;
+    setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({
-        display_name: draft.display_name,
-        phone_number: draft.phone_number,
-        current_mood: draft.current_mood,
-        username: draft.username,
-      })
+      .update({ [field]: value })
       .eq("id", user.id);
+    setSaving(false);
     if (error) {
       feedbackError();
-      toast("Failed to save — username may already be taken");
+      if (field === "username") {
+        toast("Username already taken");
+        setDraft((d) => ({ ...d, username: user.username || "" }));
+      } else {
+        toast("Failed to save");
+      }
     } else {
       feedbackSuccess();
       await refreshUser();
-      setEditing(false);
-      toast("Profile updated! ✅");
     }
   };
 
@@ -218,36 +219,8 @@ export default function ProfilePage() {
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Profile</h1>
-          {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="text-callme text-[13px] font-medium flex items-center gap-1 border border-callme-200 px-3.5 py-1.5 rounded-[12px] hover:bg-callme-50 transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" /> Edit
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setEditing(false);
-                  setDraft({
-                    display_name: user.display_name,
-                    phone_number: user.phone_number || "",
-                    current_mood: user.current_mood || "",
-                    username: user.username || "",
-                  });
-                }}
-                className="text-[13px] border border-gray-200 px-3 py-1.5 rounded-[12px] text-gray-500"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={save}
-                className="callme-gradient text-white text-[13px] px-3.5 py-1.5 rounded-[12px] font-semibold flex items-center gap-1"
-              >
-                <Save className="w-3.5 h-3.5" /> Save
-              </button>
-            </div>
+          {saving && (
+            <span className="text-[12px] text-gray-400 animate-pulse">Saving…</span>
           )}
         </div>
       </header>
@@ -286,35 +259,21 @@ export default function ProfilePage() {
                 onChange={uploadPhoto}
               />
             </div>
-            {editing ? (
+            <input
+              className="w-full text-center text-xl font-bold px-4 py-2 border-2 border-dashed border-transparent rounded-[14px] bg-transparent focus:outline-none focus:border-callme hover:border-gray-200 transition-colors"
+              value={draft.display_name}
+              onChange={(e) => setDraft({ ...draft, display_name: e.target.value })}
+              onBlur={(e) => saveField("display_name", e.target.value)}
+            />
+            <div className="flex items-center justify-center gap-1 mt-1">
+              <span className="text-gray-400 text-sm">@</span>
               <input
-                className="w-full text-center text-xl font-bold px-4 py-2 border-2 border-dashed border-gray-300 rounded-[14px] bg-transparent focus:outline-none focus:border-callme"
-                value={draft.display_name}
-                onChange={(e) =>
-                  setDraft({ ...draft, display_name: e.target.value })
-                }
+                className="text-center text-sm text-gray-500 border border-dashed border-transparent rounded-lg bg-transparent w-32 py-1 focus:outline-none focus:border-callme hover:border-gray-200 transition-colors"
+                value={draft.username}
+                onChange={(e) => setDraft({ ...draft, username: e.target.value })}
+                onBlur={(e) => saveField("username", e.target.value)}
               />
-            ) : (
-              <h2 className="font-display text-2xl font-bold">
-                {user.display_name}
-              </h2>
-            )}
-            {editing ? (
-              <div className="flex items-center justify-center gap-1 mt-1">
-                <span className="text-gray-400 text-sm">@</span>
-                <input
-                  className="text-center text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg bg-transparent w-32 py-1 focus:outline-none focus:border-callme"
-                  value={draft.username}
-                  onChange={(e) =>
-                    setDraft({ ...draft, username: e.target.value })
-                  }
-                />
-              </div>
-            ) : (
-              <p className="text-gray-400 text-sm mt-0.5">
-                @{user.username}
-              </p>
-            )}
+            </div>
           </div>
 
           <div className="h-px bg-gray-100 my-4" />
@@ -325,24 +284,14 @@ export default function ProfilePage() {
               <label className="text-[13px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
                 <MessageCircle className="w-3.5 h-3.5" /> What's on your mind?
               </label>
-              {editing ? (
-                <textarea
-                  className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 resize-none"
-                  rows={2}
-                  value={draft.current_mood}
-                  onChange={(e) =>
-                    setDraft({ ...draft, current_mood: e.target.value })
-                  }
-                  placeholder="A show, game, sports, something on your mind..."
-                />
-              ) : (
-                <div className="bg-[#f8f6f3] p-3.5 rounded-[14px] text-sm min-h-[44px]">
-                  {user.current_mood
-                    ? <span className="text-gray-600 italic">{user.current_mood}</span>
-                    : <span className="text-gray-400">Nothing yet — give friends a reason to call</span>
-                  }
-                </div>
-              )}
+              <textarea
+                className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 resize-none"
+                rows={2}
+                value={draft.current_mood}
+                onChange={(e) => setDraft({ ...draft, current_mood: e.target.value })}
+                onBlur={(e) => saveField("current_mood", e.target.value)}
+                placeholder="A show, game, sports, something on your mind..."
+              />
             </div>
 
             {/* Phone */}
@@ -350,21 +299,15 @@ export default function ProfilePage() {
               <label className="text-[13px] font-semibold text-gray-600 mb-1.5 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" /> Phone Number
               </label>
-              {editing ? (
-                <input
-                  className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
-                  value={draft.phone_number}
-                  onChange={(e) =>
-                    setDraft({ ...draft, phone_number: e.target.value })
-                  }
-                  placeholder="+1 (555) 123-4567"
-                />
-              ) : (
-                <div className="bg-[#f8f6f3] p-3.5 rounded-[14px] text-sm text-gray-600">
-                  {user.phone_number || "No phone added"}
-                </div>
-              )}
-              {!editing && !user.phone_number && (
+              <input
+                className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
+                value={draft.phone_number}
+                onChange={(e) => setDraft({ ...draft, phone_number: e.target.value })}
+                onBlur={(e) => saveField("phone_number", e.target.value)}
+                placeholder="+1 (555) 123-4567"
+                type="tel"
+              />
+              {!user.phone_number && (
                 <p className="text-xs text-gray-400 mt-1.5 ml-1">
                   Add your phone number so friends can call you
                 </p>
