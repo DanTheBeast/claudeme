@@ -37,6 +37,65 @@ const AppContext = createContext<AppContextType>({
 
 export const useApp = () => useContext(AppContext);
 
+const TIPS = [
+  // App tips
+  { emoji: "📞", text: "Tap the big button to go available. Your friends see it the moment you do." },
+  { emoji: "⏱️", text: "Set a timer so you go offline automatically. No more awkward \"still there?\" moments." },
+  { emoji: "💬", text: "Add a status to give friends a reason to call. A show, a game, whatever's on your mind." },
+  { emoji: "🔔", text: "Turn on Availability Alerts to get notified the moment a friend goes free." },
+  { emoji: "📅", text: "Set a weekly schedule so friends know when you're usually around." },
+  { emoji: "🤫", text: "Mute a friend to hide their status without unfriending them." },
+  { emoji: "👀", text: "Hide your online status if you want to browse without anyone knowing." },
+  { emoji: "📵", text: "No feed, no likes, no algorithm. Just real calls with people you actually care about." },
+  // Conversation starters
+  { emoji: "🎬", text: "Ask them what they've been watching lately. Everyone has something." },
+  { emoji: "😂", text: "Tell them about something that made you laugh this week." },
+  { emoji: "🌱", text: "Ask what they've been working on. People love talking about what they're building." },
+  { emoji: "🤔", text: "\"What's been on your mind lately?\" Simple question. Always goes somewhere good." },
+  { emoji: "🎵", text: "Ask what they've had on repeat. Music is an easy in." },
+  { emoji: "✈️", text: "Ask if they've been anywhere new lately, or if they're planning to." },
+  { emoji: "😤", text: "Ask what's been stressing them out. Sometimes people just need to vent." },
+  { emoji: "🍕", text: "Ask if they've eaten anywhere good recently. Food never fails." },
+  { emoji: "💭", text: "\"How are you actually doing?\" Not the polite version. The real one." },
+  { emoji: "🎮", text: "Ask what they've been playing, reading, or into lately. Curiosity is contagious." },
+];
+
+function LoadingScreen() {
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * TIPS.length));
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Fade out, swap tip, fade in
+      setVisible(false);
+      setTimeout(() => {
+        setTipIndex((i) => (i + 1) % TIPS.length);
+        setVisible(true);
+      }, 400);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const tip = TIPS[tipIndex];
+
+  return (
+    <div className="min-h-screen bg-[#FDFBF9] flex flex-col items-center justify-center px-8">
+      <img src="/logo.png" alt="CallMe" className="w-14 h-14 rounded-[18px] mx-auto mb-6 animate-pulse" />
+      <div
+        style={{
+          opacity: visible ? 1 : 0,
+          transition: "opacity 0.4s ease",
+          minHeight: 72,
+        }}
+        className="text-center"
+      >
+        <div className="text-3xl mb-2">{tip.emoji}</div>
+        <p className="text-gray-500 text-sm leading-relaxed max-w-[260px] mx-auto">{tip.text}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -266,14 +325,7 @@ export default function DashboardLayout({
   const toast = useCallback((msg: string) => setToastMsg(msg), []);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#FDFBF9] flex items-center justify-center">
-        <div className="text-center">
-          <img src="/logo.png" alt="CallMe" className="w-14 h-14 rounded-[18px] mx-auto mb-3 animate-pulse" />
-          <p className="text-gray-400 text-sm">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (!authed) {

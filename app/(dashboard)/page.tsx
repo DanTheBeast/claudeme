@@ -157,9 +157,27 @@ export default function HomePage() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "profiles" },
         (payload) => {
-          // Only reload if a friend's profile changed, not our own
-          // (our own changes are handled by the layout's refreshUser)
-          if (payload.new.id !== user?.id) loadFriends();
+          const updated = payload.new as Profile;
+          // Skip our own profile — layout handles that via its own channel
+          if (updated.id === user?.id) return;
+          // Patch the friend in state directly from the payload — no re-fetch needed.
+          // This is faster and doesn't depend on RLS re-queries on the Realtime channel.
+          setFriends((prev) => {
+            const idx = prev.findIndex((f) => f.friend.id === updated.id);
+            if (idx === -1) return prev; // not a friend, ignore
+            const patched = [...prev];
+            patched[idx] = {
+              ...patched[idx],
+              friend: {
+                ...updated,
+                // Respect show_online_status — hide availability if friend has it off
+                is_available: updated.show_online_status ? updated.is_available : false,
+              },
+            };
+            // Keep cache in sync too
+            cacheWrite("home_friends", user!.id, patched);
+            return patched;
+          });
         }
       )
       .subscribe();
