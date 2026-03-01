@@ -18,7 +18,9 @@ import {
   Timer,
   Infinity,
   ArrowRight,
+  Share2,
 } from "lucide-react";
+import { Share } from "@capacitor/share";
 import Link from "next/link";
 import type { FriendWithProfile, Profile } from "@/app/_lib/types";
 
@@ -57,7 +59,7 @@ export default function HomePage() {
   const [countdown, setCountdown] = useState<string | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Optimistic UI overrides — set immediately on tap, cleared after refreshUser resolves
+  // Optimistic UI overrides — set immediately on tap, held until Realtime confirms
   const [localAvailable, setLocalAvailable] = useState<boolean | null>(null);
   const [localAvailableUntil, setLocalAvailableUntil] = useState<string | null | undefined>(undefined);
 
@@ -65,13 +67,37 @@ export default function HomePage() {
   const isAvailable = localAvailable !== null ? localAvailable : (user?.is_available ?? false);
   const availableUntil = localAvailableUntil !== undefined ? localAvailableUntil : (user?.available_until ?? null);
 
+  // Clear the local override only once Realtime has synced the context to match.
+  // This prevents the flash: optimistic=true → clear override → context still false → flash off → Realtime → on.
+  useEffect(() => {
+    if (localAvailable === null) return;
+    if (user?.is_available === localAvailable) {
+      setLocalAvailable(null);
+      setLocalAvailableUntil(undefined);
+    }
+  }, [user?.is_available, user?.available_until]);
+
   useEffect(() => {
     if (!user) return;
 
-    // Seed from cache immediately so there's no skeleton on resume
+    // Seed from cache immediately so there's no skeleton on resume.
+    // Also expire any friends whose available_until has passed — their phone
+    // will have written is_available=false to the DB, but Realtime may not
+    // have arrived yet (or was missed). We can determine this locally.
     const cached = cacheRead<FriendWithProfile[]>("home_friends", user.id);
     if (cached && !friendsLoadedOnce.current) {
-      setFriends(cached);
+      const now = Date.now();
+      const withExpiry = cached.map((f) => {
+        if (
+          f.friend.is_available &&
+          f.friend.available_until &&
+          new Date(f.friend.available_until).getTime() < now
+        ) {
+          return { ...f, friend: { ...f.friend, is_available: false, available_until: null } };
+        }
+        return f;
+      });
+      setFriends(withExpiry);
       setLoadingFriends(false);
       friendsLoadedOnce.current = true;
     }
@@ -131,6 +157,15 @@ export default function HomePage() {
         if (!friend.show_online_status) {
           friend.is_available = false;
         }
+        // Local expiry — if available_until has passed, treat as unavailable.
+        // The friend's phone will have written is_available=false to the DB already,
+        // but the DB row may not have updated yet if their app was backgrounded.
+        if (friend.is_available && friend.available_until) {
+          if (new Date(friend.available_until).getTime() < Date.now()) {
+            friend.is_available = false;
+            friend.available_until = null;
+          }
+        }
         return {
           id: friendship?.id || 0,
           status: "accepted",
@@ -165,14 +200,17 @@ export default function HomePage() {
           setFriends((prev) => {
             const idx = prev.findIndex((f) => f.friend.id === updated.id);
             if (idx === -1) return prev; // not a friend, ignore
+            // Apply same local expiry + show_online_status rules as loadFriends
+            let isAvailable = updated.show_online_status ? updated.is_available : false;
+            let availableUntil = updated.available_until;
+            if (isAvailable && availableUntil && new Date(availableUntil).getTime() < Date.now()) {
+              isAvailable = false;
+              availableUntil = null;
+            }
             const patched = [...prev];
             patched[idx] = {
               ...patched[idx],
-              friend: {
-                ...updated,
-                // Respect show_online_status — hide availability if friend has it off
-                is_available: updated.show_online_status ? updated.is_available : false,
-              },
+              friend: { ...updated, is_available: isAvailable, available_until: availableUntil },
             };
             // Keep cache in sync too
             cacheWrite("home_friends", user!.id, patched);
@@ -214,9 +252,7 @@ export default function HomePage() {
             .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
             .eq("id", user!.id)
             .then(() => {
-              // Realtime subscription will sync context
-              setLocalAvailable(null);
-              setLocalAvailableUntil(undefined);
+              // useEffect watching user.is_available will clear local overrides once Realtime confirms
             });
         } else {
           setCountdown(formatCountdown(availableUntil));
@@ -253,13 +289,9 @@ export default function HomePage() {
       toast("Failed to update availability — try again");
       return;
     }
-    // Don't call refreshUser() here — the Realtime subscription in the layout
-    // will update the user context when the DB change arrives. Calling refreshUser()
-    // races with the DB write and can overwrite user with stale data if the user
-    // navigates away before it completes.
-    // Clear overrides — Realtime will sync context momentarily
-    setLocalAvailable(null);
-    setLocalAvailableUntil(undefined);
+    // Don't clear local overrides here — the useEffect above will clear them
+    // once Realtime syncs user.is_available to match. Clearing here causes a
+    // flash: optimistic on → clear → context still false → flash off → Realtime → on.
     toast(minutes ? `You're available for ${DURATIONS.find(d => d.minutes === minutes)?.label}! 📞` : "You're available! 📞");
   };
 
@@ -281,9 +313,8 @@ export default function HomePage() {
       toast("Failed to update availability — try again");
       return;
     }
-    // Realtime subscription in layout will sync context — no need to refreshUser()
-    setLocalAvailable(null);
-    setLocalAvailableUntil(undefined);
+    // Don't clear local overrides here — the useEffect above will clear them
+    // once Realtime syncs user.is_available to match.
     toast("You're now unavailable");
   };
 
@@ -525,21 +556,32 @@ export default function HomePage() {
         {/* ── No friends empty state ── */}
         {!loadingFriends && friends.length === 0 && (
           <div className="bg-white rounded-[22px] p-8 shadow-sm border border-gray-100 text-center anim-fade-up-1">
-            <div className="w-[120px] h-[120px] rounded-full bg-gradient-to-br from-callme-50 to-orange-50 flex items-center justify-center mx-auto mb-5">
-              <Plus className="w-12 h-12 text-callme/50" />
-            </div>
-            <h3 className="font-display text-xl font-bold mb-1.5">
-              Your people go here
+            <div className="text-5xl mb-4">📱</div>
+            <h3 className="font-display text-xl font-bold mb-2">
+              Get your friends on here
             </h3>
-            <p className="text-gray-400 text-sm leading-relaxed mb-5">
-              Add the friends and family you actually want to talk to
-              — not the whole internet.
+            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+              CallMe only works if your people are on it too. Text a few friends the link and get them to download it.
             </p>
+            <button
+              onClick={async () => {
+                try {
+                  await Share.share({
+                    title: "Download CallMe",
+                    text: "I've been using this app called CallMe to share when I'm free to talk. Way better than texting back and forth. Download it:",
+                    url: "https://apps.apple.com/app/just-call-me-app/id6759512338",
+                  });
+                } catch {}
+              }}
+              className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all w-full justify-center mb-3"
+            >
+              <Share2 className="w-4 h-4" /> Text a friend the link
+            </button>
             <Link
               href="/friends"
-              className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
+              className="text-callme text-sm font-medium inline-flex items-center gap-1.5 border border-callme-200 px-5 py-2.5 rounded-[14px] hover:bg-callme-50 transition-colors w-full justify-center"
             >
-              <Plus className="w-4 h-4" /> Find Friends
+              <Plus className="w-4 h-4" /> Add by username
             </Link>
           </div>
         )}

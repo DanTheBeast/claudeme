@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar } from "./avatar";
-import { Phone, Sparkles, BellOff } from "lucide-react";
+import { Phone, Sparkles, BellOff, Timer } from "lucide-react";
 import type { Profile } from "@/app/_lib/types";
 import { hapticMedium, hapticLight } from "@/app/_lib/haptics";
 
@@ -12,6 +12,18 @@ function relativeTime(d: string | Date): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function timeLeft(until: string | null): string | null {
+  if (!until) return null;
+  const ms = new Date(until).getTime() - Date.now();
+  if (ms <= 0) return null;
+  const totalMins = Math.floor(ms / 60000);
+  if (totalMins < 1) return "< 1 min left";
+  if (totalMins < 60) return `${totalMins} min left`;
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  return m > 0 ? `${h}h ${m}m left` : `${h}h left`;
 }
 
 export function FriendCard({
@@ -73,6 +85,14 @@ export function FriendCard({
               <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
               <span className="text-[12px] text-gray-500 truncate italic">
                 {friend.current_mood}
+              </span>
+            </div>
+          )}
+          {!isMuted && friend.is_available && timeLeft(friend.available_until) && (
+            <div className="flex items-center gap-1 mt-1">
+              <Timer className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+              <span className="text-[12px] text-emerald-600">
+                {timeLeft(friend.available_until)}
               </span>
             </div>
           )}
