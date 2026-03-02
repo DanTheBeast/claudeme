@@ -21,6 +21,33 @@ import {
   Volume2,
 } from "lucide-react";
 // Clock is kept for Availability Alerts toggle
+
+// Resize an image file to maxPx on the longest side and compress as JPEG.
+// Runs entirely client-side via canvas — no server round-trip needed.
+function resizeImage(file: File, maxPx: number, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const { naturalWidth: w, naturalHeight: h } = img;
+      const scale = Math.min(1, maxPx / Math.max(w, h));
+      const canvas = document.createElement("canvas");
+      canvas.width  = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => blob ? resolve(blob) : reject(new Error("Canvas toBlob failed")),
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
+    img.src = url;
+  });
+}
+
 export default function ProfilePage() {
   const { user, refreshUser, toast } = useApp();
   const supabase = createClient();
@@ -84,25 +111,23 @@ export default function ProfilePage() {
     const file = e.target.files[0];
     setUploadingPhoto(true);
     try {
-      const ext = file.name.split(".").pop();
-      const path = `${user.id}/avatar.${ext}`;
+      // Resize and compress to JPEG before uploading.
+      // iPhone photos can be 10-15MB — we only need ~400px for a profile pic.
+      const compressed = await resizeImage(file, 400, 0.85);
+      const path = `${user.id}/avatar.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(path, file, { upsert: true });
+        .upload(path, compressed, { upsert: true, contentType: "image/jpeg" });
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(path);
-      // Store the clean URL without cache-busting params — the timestamp query
-      // param is appended at render time by the Avatar component to bust CDN cache.
       const publicUrl = urlData.publicUrl;
       await supabase
         .from("profiles")
         .update({ profile_picture: publicUrl })
         .eq("id", user.id);
       await refreshUser();
-      // Bust the browser/CDN cache for this session so the new photo shows immediately.
-      // We do NOT store this timestamp in the DB — just use it locally for rendering.
       setAvatarBust(String(Date.now()));
       toast("Photo updated!");
     } catch {
