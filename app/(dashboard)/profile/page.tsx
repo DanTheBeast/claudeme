@@ -28,7 +28,14 @@ function resizeImage(file: File, maxPx: number, quality: number): Promise<Blob> 
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
+    // Guard against HEIC/HEIF decode hangs — iOS WKWebView can stall decoding
+    // large camera photos, so we give it 30s before giving up.
+    const decodeTimeout = setTimeout(() => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Image decode timed out"));
+    }, 30000);
     img.onload = () => {
+      clearTimeout(decodeTimeout);
       URL.revokeObjectURL(url);
       const { naturalWidth: w, naturalHeight: h } = img;
       const scale = Math.min(1, maxPx / Math.max(w, h));
@@ -43,7 +50,11 @@ function resizeImage(file: File, maxPx: number, quality: number): Promise<Blob> 
         quality
       );
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Image load failed")); };
+    img.onerror = () => {
+      clearTimeout(decodeTimeout);
+      URL.revokeObjectURL(url);
+      reject(new Error("Image load failed"));
+    };
     img.src = url;
   });
 }
@@ -118,9 +129,11 @@ export default function ProfilePage() {
       const compressed = await resizeImage(file, 400, 0.85);
       const path = `${user.id}/avatar.jpg`;
 
-      // Wrap the upload in a 15s timeout so a hung request never freezes the app
+      // Wrap the upload in a 45s timeout so a hung request never freezes the app.
+      // Camera photos on iOS can take extra time to decode (HEIC→JPEG conversion
+      // happens in the browser before resizeImage even starts), so 15s was too tight.
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Upload timed out")), 15000)
+        setTimeout(() => reject(new Error("Upload timed out")), 45000)
       );
       const upload = supabase.storage
         .from("avatars")
@@ -141,8 +154,13 @@ export default function ProfilePage() {
       setAvatarBust(String(Date.now()));
       toast("Photo updated!");
     } catch (err: unknown) {
-      const msg = err instanceof Error && err.message === "Upload timed out"
+      const errMsg = err instanceof Error ? err.message : "";
+      const msg = errMsg === "Upload timed out"
         ? "Upload timed out — check your connection and try again"
+        : errMsg === "Image decode timed out"
+        ? "Photo took too long to process — try again"
+        : errMsg === "Image load failed"
+        ? "Couldn't read that photo — try a different one"
         : "Failed to upload photo";
       toast(msg);
       feedbackError();
