@@ -202,23 +202,33 @@ export default function FriendsPage() {
 
       // Search by name/username always; email only if allow_phone_search is true.
       // Both gated by allow_friend_requests so private users are never surfaced.
-      const { data } = await supabase
+      const excludeIds = Array.from(existingIds);
+
+      const nameQuery = supabase
         .from("profiles")
         .select("*")
         .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
         .eq("allow_friend_requests", true)
-        .not("id", "in", `(${Array.from(existingIds).join(",")})`)
         .limit(10);
 
+      // Only apply exclusion filter if there are IDs to exclude —
+      // passing an empty array to .not("id","in",[]) causes a PostgREST error.
+      const { data } = excludeIds.length > 0
+        ? await nameQuery.not("id", "in", `(${excludeIds.join(",")})`)
+        : await nameQuery;
+
       // Also search by email for users who allow it, then merge + deduplicate
-      const { data: emailResults } = await supabase
+      const emailQuery = supabase
         .from("profiles")
         .select("*")
         .ilike("email", `%${searchQuery}%`)
         .eq("allow_friend_requests", true)
         .eq("allow_phone_search", true)
-        .not("id", "in", `(${Array.from(existingIds).join(",")})`)
         .limit(10);
+
+      const { data: emailResults } = excludeIds.length > 0
+        ? await emailQuery.not("id", "in", `(${excludeIds.join(",")})`)
+        : await emailQuery;
 
       const merged = [...(data || [])];
       for (const p of (emailResults || [])) {
