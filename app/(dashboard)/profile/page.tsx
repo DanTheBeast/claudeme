@@ -109,16 +109,26 @@ export default function ProfilePage() {
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user || !e.target.files?.[0]) return;
     const file = e.target.files[0];
+    // Reset the input so the same file can be reselected after a failure
+    e.target.value = "";
     setUploadingPhoto(true);
     try {
       // Resize and compress to JPEG before uploading.
       // iPhone photos can be 10-15MB — we only need ~400px for a profile pic.
       const compressed = await resizeImage(file, 400, 0.85);
       const path = `${user.id}/avatar.jpg`;
-      const { error: uploadError } = await supabase.storage
+
+      // Wrap the upload in a 15s timeout so a hung request never freezes the app
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Upload timed out")), 15000)
+      );
+      const upload = supabase.storage
         .from("avatars")
         .upload(path, compressed, { upsert: true, contentType: "image/jpeg" });
+
+      const { error: uploadError } = await Promise.race([upload, timeout]);
       if (uploadError) throw uploadError;
+
       const { data: urlData } = supabase.storage
         .from("avatars")
         .getPublicUrl(path);
@@ -130,10 +140,16 @@ export default function ProfilePage() {
       await refreshUser();
       setAvatarBust(String(Date.now()));
       toast("Photo updated!");
-    } catch {
-      toast("Failed to upload photo");
+    } catch (err: unknown) {
+      const msg = err instanceof Error && err.message === "Upload timed out"
+        ? "Upload timed out — check your connection and try again"
+        : "Failed to upload photo";
+      toast(msg);
+      feedbackError();
+    } finally {
+      // Always clear the uploading state — never leave the spinner stuck
+      setUploadingPhoto(false);
     }
-    setUploadingPhoto(false);
   };
 
   const updateSetting = async (key: string, value: boolean) => {
