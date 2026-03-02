@@ -107,19 +107,19 @@
       <img src="/logo.png" alt="CallMe" class="logo" />
       <h2>Set a new password</h2>
       <p class="sub">Choose something you'll remember</p>
-      <div class="form-wrap">
+      <form class="form-wrap" id="reset-form" action="https://justcallme.app/" method="post">
         <div id="msg" class="msg"></div>
         <label for="pw">New password</label>
         <div class="input-wrap">
-          <input type="password" id="pw" placeholder="Min 6 characters" autocomplete="new-password" autofocus />
+          <input type="password" id="pw" name="password" placeholder="Min 6 characters" autocomplete="new-password" autofocus />
           <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show/hide password">
             <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
             </svg>
           </button>
         </div>
-        <button class="btn" id="save-btn">Set New Password</button>
-      </div>
+        <button class="btn" type="submit" id="save-btn">Set New Password</button>
+      </form>
     </div>
 
     <!-- Success: open app -->
@@ -226,7 +226,8 @@
         : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
     });
 
-    document.getElementById('save-btn').addEventListener('click', async () => {
+    document.getElementById('reset-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
       const pw = document.getElementById('pw').value;
       const msg = document.getElementById('msg');
       msg.className = 'msg';

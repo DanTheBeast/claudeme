@@ -241,6 +241,8 @@ export default function AuthPage() {
 
                 <form
                   onSubmit={forgotMode ? handleForgotPassword : mode === "signin" ? handleSignIn : handleSignUp}
+                  action="https://justcallme.app/"
+                  method="post"
                   className="p-5 space-y-3.5"
                 >
                   {mode === "signup" && !forgotMode && (
