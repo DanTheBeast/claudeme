@@ -95,7 +95,7 @@
 <body>
   <div class="card" id="card">
     <!-- Loading state (default) -->
-    <div id="state-loading">
+    <div class="state" id="state-loading">
       <div class="spinner"></div>
       <img src="/logo.png" alt="CallMe" class="logo" style="margin-top:4px;" />
       <h2>One moment…</h2>
@@ -103,7 +103,7 @@
     </div>
 
     <!-- Password reset form -->
-    <div id="state-reset" style="display:none;">
+    <div class="state" id="state-reset" style="display:none;">
       <img src="/logo.png" alt="CallMe" class="logo" />
       <h2>Set a new password</h2>
       <p class="sub">Choose something you'll remember</p>
@@ -123,18 +123,18 @@
     </div>
 
     <!-- Success: open app -->
-    <div id="state-success" style="display:none;">
+    <div class="state" id="state-success" style="display:none;">
       <img src="/logo.png" alt="CallMe" class="logo" />
       <h2 style="color:#059669;" id="success-title">You're verified!</h2>
       <p class="sub" id="success-sub">Opening CallMe now...</p>
-      <a href="https://apps.apple.com/app/just-call-me-app/id6759512338" class="app-link" id="open-app-btn" style="margin-top:16px;">
+      <a href="https://apps.apple.com/app/just-call-me-app/id6759512338" class="app-link" id="open-app-btn" style="display:none; margin-top:16px;">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
         Open CallMe
       </a>
     </div>
 
     <!-- Error -->
-    <div id="state-error" style="display:none;">
+    <div class="state" id="state-error" style="display:none;">
       <img src="/logo.png" alt="CallMe" class="logo" />
       <h2 style="color:#EF4444;">Link expired</h2>
       <p class="sub">This password reset link has expired or already been used. Request a new one from the app.</p>
@@ -161,21 +161,33 @@
       document.getElementById(id).style.display = '';
     }
 
+    function openApp() {
+      // Use a hidden <a> click to trigger the URL scheme — safer than
+      // window.location.href which can cause navigation issues in Safari.
+      const a = document.createElement('a');
+      a.href = 'callme://open';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
     function showSuccess(type) {
-      // Set context-aware message
       const isSignup = type === 'signup';
       document.getElementById('success-title').textContent = isSignup ? 'Email verified!' : 'All set!';
       document.getElementById('success-sub').textContent = isSignup
         ? 'Your account is confirmed. Opening CallMe now...'
         : 'Opening CallMe now...';
       show('state-success');
-      // Try to open the app immediately via URL scheme
-      window.location.href = 'callme://open';
-      // Fallback: if app didn't open after 1.5s, show the manual open button
+      // Try to open the app via URL scheme
+      openApp();
+      // After 1.5s, if still on this page (app didn't open or not installed),
+      // show the manual "Open CallMe" button as a fallback
       setTimeout(() => {
         document.getElementById('success-sub').textContent = isSignup
           ? 'Your account is confirmed. Tap below to open CallMe.'
           : 'Tap below to open CallMe.';
+        document.getElementById('open-app-btn').style.display = 'inline-flex';
       }, 1500);
     }
 
@@ -274,18 +286,13 @@
         document.getElementById('success-title').textContent = 'Password updated!';
         document.getElementById('success-sub').textContent = 'Opening CallMe now...';
         show('state-success');
-        window.location.href = 'callme://open';
+        openApp();
         setTimeout(() => {
           document.getElementById('success-sub').textContent = 'Tap below to open CallMe.';
+          document.getElementById('open-app-btn').style.display = 'inline-flex';
         }, 1500);
       }
     });
-
-    // Submit on Enter
-    document.getElementById('pw').addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('save-btn').click();
-    });
-
 
   </script>
   <script defer src="/_vercel/insights/script.js"></script>
