@@ -65,15 +65,20 @@ function LoadingScreen() {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    let fadeTimer: ReturnType<typeof setTimeout> | null = null;
     const interval = setInterval(() => {
       // Fade out, swap tip, fade in
       setVisible(false);
-      setTimeout(() => {
+      fadeTimer = setTimeout(() => {
         setTipIndex((i) => (i + 1) % TIPS.length);
         setVisible(true);
       }, 400);
     }, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Also cancel the inner fade timer so it doesn't fire on an unmounted component
+      if (fadeTimer) clearTimeout(fadeTimer);
+    };
   }, []);
 
   const tip = TIPS[tipIndex];

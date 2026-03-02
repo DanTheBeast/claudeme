@@ -42,7 +42,8 @@ function resizeImage(file: File, maxPx: number, quality: number): Promise<Blob> 
       const canvas = document.createElement("canvas");
       canvas.width  = Math.round(w * scale);
       canvas.height = Math.round(h * scale);
-      const ctx = canvas.getContext("2d")!;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas context unavailable")); return; }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(
         (blob) => blob ? resolve(blob) : reject(new Error("Canvas toBlob failed")),
@@ -67,6 +68,9 @@ export default function ProfilePage() {
   const [avatarBust, setAvatarBust] = useState<string | null>(null);
   const [appSounds, setAppSounds] = useState(() => soundsEnabled());
   const [saving, setSaving] = useState(false);
+  // Queue for pending saves: if a save is in-flight when a second blur fires,
+  // store it and run it after the first one completes.
+  const pendingSave = useRef<{ field: string; value: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState({
     display_name: user?.display_name || "",
@@ -87,7 +91,8 @@ export default function ProfilePage() {
     }
   }, [user?.id]);
 
-  // Auto-save on blur — called when any field loses focus
+  // Auto-save on blur — called when any field loses focus.
+  // If a save is already in-flight, queue the latest value and run it after.
   const saveField = async (field: string, value: string) => {
     if (!user) return;
     if (field === "display_name" && !value.trim()) {
@@ -96,7 +101,11 @@ export default function ProfilePage() {
       setDraft((d) => ({ ...d, display_name: user.display_name || "" }));
       return;
     }
-    if (saving) return;
+    if (saving) {
+      // Don't drop it — queue it so it runs after the current save finishes
+      pendingSave.current = { field, value };
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
@@ -114,6 +123,12 @@ export default function ProfilePage() {
     } else {
       feedbackSuccess();
       await refreshUser();
+    }
+    // Flush any queued save that arrived while this one was in-flight
+    if (pendingSave.current) {
+      const next = pendingSave.current;
+      pendingSave.current = null;
+      saveField(next.field, next.value);
     }
   };
 
@@ -159,8 +174,8 @@ export default function ProfilePage() {
         ? "Upload timed out — check your connection and try again"
         : errMsg === "Image decode timed out"
         ? "Photo took too long to process — try again"
-        : errMsg === "Image load failed"
-        ? "Couldn't read that photo — try a different one"
+        : errMsg === "Image load failed" || errMsg === "Canvas context unavailable"
+        ? "Couldn't process that photo — try a different one"
         : "Failed to upload photo";
       toast(msg);
       feedbackError();
@@ -180,6 +195,8 @@ export default function ProfilePage() {
     if (error) {
       feedbackError();
       toast("Failed to save setting — try again");
+      // Revert by refreshing from DB so toggle snaps back to its real state
+      await refreshUser();
       return;
     }
     await refreshUser();

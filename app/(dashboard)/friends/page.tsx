@@ -238,10 +238,13 @@ export default function FriendsPage() {
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  // Include friends and pendingRequests so the exclusion list is always current.
+  // Without these, accepting a request while the search box is open would still
+  // show that person as an "Add" result until the component re-mounts.
+  }, [searchQuery, friends, pendingRequests]);
 
   const sendFriendRequest = async (recipientId: string) => {
-    if (!user || sendingRequest) return;
+    if (!user || sendingRequest === recipientId) return;
     if (recipientId === user.id) return;
     setSendingRequest(recipientId);
     const { error } = await supabase.from("friendships").insert({
@@ -654,7 +657,7 @@ export default function FriendsPage() {
                   </div>
                   <button
                     onClick={() => sendFriendRequest(p.id)}
-                    disabled={!!sendingRequest}
+                    disabled={sendingRequest === p.id}
                     className="callme-gradient text-white px-3.5 py-1.5 rounded-[10px] text-xs font-semibold flex items-center gap-1 disabled:opacity-60"
                   >
                     {sendingRequest === p.id ? (

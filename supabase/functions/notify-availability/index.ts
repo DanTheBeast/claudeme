@@ -158,39 +158,42 @@ Deno.serve(async (req) => {
       return new Response("dedupe", { status: 200 });
     }
 
-    // Fetch friends, tokens, and profiles all in parallel
-    const [friendshipsRes, tokensRes] = await Promise.all([
-      supabase
-        .from("friendships")
-        .select("user_id, friend_id, is_muted")
-        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
-        .eq("status", "accepted"),
-      supabase
-        .from("push_tokens")
-        .select("token, user_id"),
-    ]);
+    // Fetch friendships first to get the friend IDs, then query tokens + profiles
+    // scoped to just those friends. Avoids a full-table scan on push_tokens.
+    const { data: friendships } = await supabase
+      .from("friendships")
+      .select("user_id, friend_id, is_muted")
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+      .eq("status", "accepted");
 
-    const friendships = friendshipsRes.data ?? [];
-    if (!friendships.length) return new Response("no friends", { status: 200 });
+    if (!friendships?.length) return new Response("no friends", { status: 200 });
 
     const friendIds = friendships
       .filter((f) => !f.is_muted)
       .map((f) => f.user_id === userId ? f.friend_id : f.user_id);
 
-    // Get notification preferences for these specific friends
-    const { data: friendProfiles } = await supabase
-      .from("profiles")
-      .select("id, notify_availability_changes, enable_push_notifications")
-      .in("id", friendIds);
+    if (!friendIds.length) return new Response("all muted", { status: 200 });
+
+    // Fetch tokens + notification prefs for these specific friends in parallel
+    const [tokensRes, profilesRes] = await Promise.all([
+      supabase
+        .from("push_tokens")
+        .select("token, user_id")
+        .in("user_id", friendIds),
+      supabase
+        .from("profiles")
+        .select("id, notify_availability_changes, enable_push_notifications")
+        .in("id", friendIds),
+    ]);
 
     const notifySet = new Set(
-      (friendProfiles ?? [])
+      (profilesRes.data ?? [])
         .filter((p) => p.enable_push_notifications && p.notify_availability_changes)
         .map((p) => p.id)
     );
 
     const targetTokens = (tokensRes.data ?? [])
-      .filter((t) => friendIds.includes(t.user_id) && notifySet.has(t.user_id));
+      .filter((t) => notifySet.has(t.user_id));
 
     if (!targetTokens.length) return new Response("no targets", { status: 200 });
 

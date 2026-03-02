@@ -88,14 +88,15 @@ export function FriendCard({
               </span>
             </div>
           )}
-          {!isMuted && friend.is_available && timeLeft(friend.available_until) && (
-            <div className="flex items-center gap-1 mt-1">
-              <Timer className="w-3 h-3 text-emerald-400 flex-shrink-0" />
-              <span className="text-[12px] text-emerald-600">
-                {timeLeft(friend.available_until)}
-              </span>
-            </div>
-          )}
+          {!isMuted && friend.is_available && (() => {
+            const tl = timeLeft(friend.available_until);
+            return tl ? (
+              <div className="flex items-center gap-1 mt-1">
+                <Timer className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                <span className="text-[12px] text-emerald-600">{tl}</span>
+              </div>
+            ) : null;
+          })()}
           {isMuted && (
             <span className="text-[11px] text-gray-400 mt-0.5 block">Muted</span>
           )}

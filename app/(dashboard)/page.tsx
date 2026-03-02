@@ -58,6 +58,7 @@ export default function HomePage() {
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Optimistic UI overrides — set immediately on tap, held until Realtime confirms
   const [localAvailable, setLocalAvailable] = useState<boolean | null>(null);
@@ -106,13 +107,13 @@ export default function HomePage() {
     async function loadFriends(): Promise<boolean> {
       const { data: sentData, error: sentErr } = await supabase
         .from("friendships")
-        .select("id, status, friend_id")
+        .select("id, status, friend_id, is_muted")
         .eq("user_id", user!.id)
         .eq("status", "accepted");
 
       const { data: receivedData, error: receivedErr } = await supabase
         .from("friendships")
-        .select("id, status, user_id")
+        .select("id, status, user_id, is_muted")
         .eq("friend_id", user!.id)
         .eq("status", "accepted");
 
@@ -169,7 +170,7 @@ export default function HomePage() {
         return {
           id: friendship?.id || 0,
           status: "accepted",
-          is_muted: false,
+          is_muted: (friendship as { is_muted?: boolean } | undefined)?.is_muted ?? false,
           friend,
         };
       });
@@ -181,9 +182,13 @@ export default function HomePage() {
       return true;
     }
 
-    // Run fetch; if it fails (auth not ready on boot), retry once after 2s
+    // Run fetch; if it fails (auth not ready on boot), retry once after 2s.
+    // Store the timer handle so it can be cancelled if the component unmounts
+    // before the retry fires (e.g. user signs out or navigates away).
     loadFriends().then((ok) => {
-      if (!ok) setTimeout(() => loadFriends(), 2000);
+      if (!ok) {
+        retryTimerRef.current = setTimeout(() => loadFriends(), 2000);
+      }
     });
 
     const channel = supabase
@@ -221,6 +226,7 @@ export default function HomePage() {
       .subscribe();
 
     return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       supabase.removeChannel(channel);
     };
   }, [user?.id, refreshKey]);
@@ -343,8 +349,9 @@ export default function HomePage() {
     toast("Status updated! ✨");
   };
 
-  const available = friends.filter((f) => f.friend.is_available);
-  const offline = friends.filter((f) => !f.friend.is_available);
+  // Muted friends are excluded from "Available now" — same behaviour as friends page
+  const available = friends.filter((f) => f.friend.is_available && !f.is_muted);
+  const offline = friends.filter((f) => !f.friend.is_available || f.is_muted);
 
   if (!user) return null;
 

@@ -40,6 +40,18 @@ export default function AuthPage() {
     text: string;
   } | null>(null);
 
+  // Show an error if the callback page redirected here with ?error=
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "callback_failed") {
+      setStep(2);
+      setMessage({ type: "error", text: "That link has expired or already been used. Please sign in or request a new link." });
+      // Clean the query param so a refresh doesn't re-show it
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const supabase = createClient();
 
   const handleSignUp = async (e: React.FormEvent) => {
