@@ -16,8 +16,12 @@ import type { Profile } from "@/app/_lib/types";
 import AuthPage from "@/app/auth/page";
 import { soundAppLaunch } from "@/app/_lib/haptics";
 import { registerPushNotifications, clearNotificationBadge } from "@/app/_lib/push-notifications";
+import { initSentry, setSentryUser, clearSentryUser } from "@/app/_lib/sentry";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { App as CapApp } from "@capacitor/app";
+
+// Initialize Sentry as early as possible — before any component renders
+initSentry();
 
 interface AppContextType {
   user: Profile | null;
@@ -147,6 +151,9 @@ export default function DashboardLayout({
 
       if (data) setUser(data as Profile);
       setAuthed(true);
+
+      // Tag Sentry with the logged-in user so errors show who was affected
+      setSentryUser(session.user.id, data?.username);
 
       // Silently sync the user's timezone — update only if it has changed
       const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -285,6 +292,7 @@ export default function DashboardLayout({
       if (event === "SIGNED_OUT") {
         setUser(null);
         setAuthed(false);
+        clearSentryUser();
         return;
       }
 
