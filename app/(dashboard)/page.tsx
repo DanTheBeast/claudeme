@@ -387,17 +387,17 @@ export default function HomePage() {
 
       <main className="px-5 pt-5 flex flex-col gap-5">
         {/* ── Compact availability strip (not a giant circle) ── */}
-        <div
-          className={`bg-white rounded-[18px] border p-4 flex items-center justify-between shadow-sm anim-fade-up ${
+        <button
+          onClick={handleAvailabilityTap}
+          className={`w-full text-left bg-white rounded-[18px] border p-4 flex items-center justify-between shadow-sm anim-fade-up transition-all active:scale-[0.98] ${
             isAvailable
               ? "border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white"
-              : "border-gray-100"
+              : "border-gray-100 hover:border-gray-200"
           }`}
         >
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleAvailabilityTap}
-              className={`w-14 h-14 rounded-full border-none cursor-pointer flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${
+            <div
+              className={`w-14 h-14 rounded-full flex-shrink-0 flex items-center justify-center transition-all ${
                 isAvailable
                   ? "bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/25 glow-green"
                   : "callme-gradient shadow-lg shadow-callme/25"
@@ -408,7 +408,7 @@ export default function HomePage() {
               ) : (
                 <PhoneOff className="w-6 h-6 text-white" />
               )}
-            </button>
+            </div>
             <div>
               <p className="font-semibold text-[15px]">
                 {isAvailable ? "You're available" : "You're unavailable"}
@@ -427,11 +427,11 @@ export default function HomePage() {
             </div>
           </div>
           <div
-            className={`w-3 h-3 rounded-full ${
+            className={`w-3 h-3 rounded-full flex-shrink-0 ${
               isAvailable ? "bg-emerald-500 status-pulse" : "bg-gray-300"
             }`}
           />
-        </div>
+        </button>
 
         {/* ── Phone number nudge — shown until user adds one ── */}
         {!user.phone_number && (

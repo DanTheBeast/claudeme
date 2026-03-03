@@ -257,6 +257,23 @@ export default function DashboardLayout({
       if (isActive) handleForeground();
     }).then((l) => { appStateListener = l; }).catch(() => {});
 
+    // Handle callme:// deep links — fired when the website callback page opens
+    // the app after email verification or password reset. The callback passes
+    // the session tokens in the URL so we can sign the user in immediately.
+    let appUrlListener: { remove: () => void } | null = null;
+    CapApp.addListener("appUrlOpen", async (data: { url: string }) => {
+      try {
+        const url = new URL(data.url);
+        const accessToken = url.searchParams.get("access_token");
+        const refreshToken = url.searchParams.get("refresh_token") || "";
+        if (accessToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          await fetchProfile();
+          setRefreshKey((k) => k + 1);
+        }
+      } catch {}
+    }).then((l) => { appUrlListener = l; }).catch(() => {});
+
     // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load.
     // IMPORTANT: only act on explicit SIGNED_OUT — never set authed=false on
     // TOKEN_REFRESHED or other transient events, which would unmount the entire
@@ -322,6 +339,7 @@ export default function DashboardLayout({
       clearTimeout(pushRetry);
       document.removeEventListener("visibilitychange", handleVisibility);
       appStateListener?.remove();
+      appUrlListener?.remove();
       subscription.unsubscribe();
       channelPromise.then((ch) => { if (ch) supabase.removeChannel(ch); });
     };

@@ -161,28 +161,32 @@
       document.getElementById(id).style.display = '';
     }
 
-    function openApp() {
-      // Use a hidden <a> click to trigger the URL scheme — safer than
-      // window.location.href which can cause navigation issues in Safari.
+    function openApp(accessToken, refreshToken) {
+      // Pass the session tokens in the URL so the app can call setSession()
+      // immediately on launch — without this the WKWebView starts with no
+      // session and the user lands on the sign-in screen despite just verifying.
+      let url = 'callme://open';
+      if (accessToken) {
+        url += `?access_token=${encodeURIComponent(accessToken)}&refresh_token=${encodeURIComponent(refreshToken || '')}`;
+      }
       const a = document.createElement('a');
-      a.href = 'callme://open';
+      a.href = url;
       a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     }
 
-    function showSuccess(type) {
+    function showSuccess(type, accessToken, refreshToken) {
       const isSignup = type === 'signup';
       document.getElementById('success-title').textContent = isSignup ? 'Email verified!' : 'All set!';
       document.getElementById('success-sub').textContent = isSignup
         ? 'Your account is confirmed. Opening CallMe now...'
         : 'Opening CallMe now...';
       show('state-success');
-      // Try to open the app via URL scheme
-      openApp();
-      // After 1.5s, if still on this page (app didn't open or not installed),
-      // show the manual "Open CallMe" button as a fallback
+      // Open the app and pass the session tokens so it can sign the user in
+      openApp(accessToken, refreshToken);
+      // After 1.5s show the manual button as a fallback (in case the app isn't installed)
       setTimeout(() => {
         document.getElementById('success-sub').textContent = isSignup
           ? 'Your account is confirmed. Tap below to open CallMe.'
@@ -231,15 +235,21 @@
       // ── Email confirmation / magic link ───────────────────────────────────
       if (type === 'signup' || type === 'magiclink' || type === 'email') {
         if (tokenHash || token) {
-          const { error } = await supabase.auth.verifyOtp({
+          const { data, error } = await supabase.auth.verifyOtp({
             token_hash: tokenHash || token,
             type: type === 'signup' ? 'signup' : 'magiclink',
           });
-          if (!error) { showSuccess(type); return; }
+          if (!error) {
+            // Pass the freshly-issued session tokens to the app deep link
+            const at = data?.session?.access_token || '';
+            const rt = data?.session?.refresh_token || '';
+            showSuccess(type, at, rt);
+            return;
+          }
         }
         if (accessToken) {
           const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-          if (!error) { showSuccess(type); return; }
+          if (!error) { showSuccess(type, accessToken, refreshToken); return; }
         }
       }
 
@@ -286,7 +296,11 @@
         document.getElementById('success-title').textContent = 'Password updated!';
         document.getElementById('success-sub').textContent = 'Opening CallMe now...';
         show('state-success');
-        openApp();
+        // Get the current session to pass tokens to the app
+        const { data: sessionData } = await supabase.auth.getSession();
+        const at = sessionData?.session?.access_token || '';
+        const rt = sessionData?.session?.refresh_token || '';
+        openApp(at, rt);
         setTimeout(() => {
           document.getElementById('success-sub').textContent = 'Tap below to open CallMe.';
           document.getElementById('open-app-btn').style.display = 'inline-flex';
