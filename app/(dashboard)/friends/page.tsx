@@ -336,9 +336,18 @@ export default function FriendsPage() {
     }
   };
 
-  const available = friends.filter((f) => !f.is_muted && f.friend.is_available);
-  const offline = friends.filter((f) => !f.is_muted && !f.friend.is_available);
-  const muted = friends.filter((f) => f.is_muted);
+  const [friendFilter, setFriendFilter] = useState("");
+
+  const filteredFriends = friendFilter.trim()
+    ? friends.filter((f) =>
+        f.friend.display_name?.toLowerCase().includes(friendFilter.toLowerCase()) ||
+        f.friend.username?.toLowerCase().includes(friendFilter.toLowerCase())
+      )
+    : friends;
+
+  const available = filteredFriends.filter((f) => !f.is_muted && f.friend.is_available);
+  const offline = filteredFriends.filter((f) => !f.is_muted && !f.friend.is_available);
+  const muted = filteredFriends.filter((f) => f.is_muted);
 
   return (
     <div className="pb-24">
@@ -366,6 +375,28 @@ export default function FriendsPage() {
       <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 56px)" }} />
 
       <main className="px-5 pt-5 flex flex-col gap-5">
+        {/* Filter bar — only shown when there are friends to filter */}
+        {friends.length > 0 && (
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              value={friendFilter}
+              onChange={(e) => setFriendFilter(e.target.value)}
+              placeholder="Filter friends..."
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all"
+            />
+            {friendFilter && (
+              <button
+                onClick={() => setFriendFilter("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Pending requests */}
         {pendingRequests.length > 0 && (
           <div className="bg-white rounded-[22px] p-5 shadow-sm border border-amber-200 anim-fade-up">
@@ -489,6 +520,13 @@ export default function FriendsPage() {
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* No filter results */}
+        {friendFilter.trim() && available.length === 0 && offline.length === 0 && muted.length === 0 && (
+          <div className="text-center py-8 text-gray-400 text-sm">
+            No friends matching &ldquo;{friendFilter}&rdquo;
           </div>
         )}
 
