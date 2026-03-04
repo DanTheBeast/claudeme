@@ -7,7 +7,7 @@ import { useApp } from "../layout";
 import { feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
 import { Avatar } from "@/app/_components/avatar";
-import { Calendar, Clock, Plus, X, Users, Phone } from "lucide-react";
+import { Calendar, Clock, Plus, X, Users, Phone, Info } from "lucide-react";
 import type { AvailabilityWindow, Profile } from "@/app/_lib/types";
 
 const DAYS = [
@@ -127,6 +127,15 @@ export default function SchedulePage() {
   } | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
+  const [showExplainer, setShowExplainer] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("callme_schedule_explained") !== "1";
+  });
+
+  const dismissExplainer = () => {
+    setShowExplainer(false);
+    try { localStorage.setItem("callme_schedule_explained", "1"); } catch {}
+  };
 
   const loadWindows = async () => {
     if (!user) return;
@@ -240,6 +249,7 @@ export default function SchedulePage() {
       feedbackSuccess();
       toast("Availability added");
       setAddModal(null);
+      dismissExplainer();
       loadWindows();
     }
   };
@@ -346,6 +356,34 @@ export default function SchedulePage() {
             })}
           </span>
         </div>
+
+        {/* Explainer banner — shown until dismissed, hidden once they have windows */}
+        {showExplainer && !loading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-[18px] p-4 flex gap-3 anim-fade-up">
+            <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-blue-900 mb-1">What is this page?</p>
+              <p className="text-[13px] text-blue-700 leading-relaxed">
+                Set the times you&apos;re <em>generally</em> free each week — like evenings or lunch breaks. CallMe uses this to show you when your schedule overlaps with a friend&apos;s, so you can find the best time to catch up without any back-and-forth texting.
+              </p>
+              <p className="text-[13px] text-blue-700 leading-relaxed mt-1.5">
+                This is separate from going available in real time — think of it as your standing availability, not a live status.
+              </p>
+              <button
+                onClick={dismissExplainer}
+                className="mt-2.5 text-[12px] font-semibold text-blue-500 hover:text-blue-700 transition-colors"
+              >
+                Got it
+              </button>
+            </div>
+            <button
+              onClick={dismissExplainer}
+              className="text-blue-400 hover:text-blue-600 flex-shrink-0 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-12 text-gray-400 text-sm">

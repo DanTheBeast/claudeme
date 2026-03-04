@@ -260,31 +260,31 @@ export default function ProfilePage() {
     {
       key: "show_online_status",
       title: "Show Online Status",
-      desc: "Let friends see when you're free",
+      desc: "Let friends see when you go available",
       icon: Eye,
     },
     {
       key: "allow_friend_requests",
       title: "Allow Friend Requests",
-      desc: "Let new people find you",
+      desc: "Let people search for and add you",
       icon: Users,
     },
     {
       key: "enable_push_notifications",
       title: "Push Notifications",
-      desc: "Get notified when friends are free",
+      desc: "Required for availability alerts to work",
       icon: Bell,
     },
     {
       key: "enable_email_notifications",
       title: "Email Notifications",
-      desc: "Receive notifications via email",
+      desc: "Get availability alerts via email too",
       icon: Mail,
     },
     {
       key: "notify_availability_changes",
       title: "Availability Alerts",
-      desc: "When friends become available",
+      desc: "Get a notification the moment a friend goes free",
       icon: Clock,
     },
   ];
