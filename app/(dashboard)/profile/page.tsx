@@ -68,6 +68,10 @@ export default function ProfilePage() {
   const [avatarBust, setAvatarBust] = useState<string | null>(null);
   const [appSounds, setAppSounds] = useState(() => soundsEnabled());
   const [saving, setSaving] = useState(false);
+  // savingRef mirrors the `saving` state but is always current inside async
+  // closures — avoids the stale-closure deadlock where saveField sees an old
+  // `saving = true` and re-queues instead of running the pending save.
+  const savingRef = useRef(false);
   // Queue for pending saves: if a save is in-flight when a second blur fires,
   // store it and run it after the first one completes.
   const pendingSave = useRef<{ field: string; value: string } | null>(null);
@@ -101,16 +105,18 @@ export default function ProfilePage() {
       setDraft((d) => ({ ...d, display_name: user.display_name || "" }));
       return;
     }
-    if (saving) {
+    if (savingRef.current) {
       // Don't drop it — queue it so it runs after the current save finishes
       pendingSave.current = { field, value };
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
       .update({ [field]: value })
       .eq("id", user.id);
+    savingRef.current = false;
     setSaving(false);
     if (error) {
       feedbackError();

@@ -736,10 +736,11 @@
                 <th>User</th>
                 <th>Joined</th>
                 <th>Friends</th>
+                <th>Times available</th>
               </tr>
             </thead>
             <tbody id="recent-users-tbody">
-              <tr><td colspan="3" class="loading"><div class="spinner"></div> Loading…</td></tr>
+              <tr><td colspan="4" class="loading"><div class="spinner"></div> Loading…</td></tr>
             </tbody>
           </table>
         </div>
@@ -1069,7 +1070,7 @@
       const tbody = document.getElementById('recent-users-tbody');
       tbody.innerHTML = '';
       if (!data.recentUsers || data.recentUsers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No users yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No users yet.</td></tr>';
         return;
       }
       for (const u of data.recentUsers) {
@@ -1081,7 +1082,8 @@
             </div>
           </td>
           <td>${formatDate(u.created_at)}</td>
-          <td>—</td>
+          <td>${u.friend_count ?? 0}</td>
+          <td>${u.availability_count ?? 0}</td>
         `;
         const cell = tr.querySelector('.user-cell');
         cell.insertBefore(avatarEl(u), cell.firstChild);

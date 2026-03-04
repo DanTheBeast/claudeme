@@ -94,6 +94,40 @@ export default async function handler(req, res) {
     db.from('friendships').select('user_id, friend_id').eq('status', 'accepted'),
   ]);
 
+  // Enrich recentUsers with friend_count and availability_count
+  if (recentUsers && recentUsers.length > 0) {
+    const recentIds = recentUsers.map(u => u.id);
+    const [
+      { data: recentFriendships },
+      { data: recentAvailEvents },
+    ] = await Promise.all([
+      db.from('friendships').select('user_id, friend_id').eq('status', 'accepted')
+        .or(recentIds.map(id => `user_id.eq.${id},friend_id.eq.${id}`).join(',')),
+      db.from('availability_events').select('user_id')
+        .in('user_id', recentIds),
+    ]);
+
+    // Count friends per user
+    const friendCountMap = {};
+    for (const id of recentIds) friendCountMap[id] = 0;
+    for (const f of (recentFriendships || [])) {
+      if (friendCountMap[f.user_id] !== undefined) friendCountMap[f.user_id]++;
+      if (friendCountMap[f.friend_id] !== undefined) friendCountMap[f.friend_id]++;
+    }
+
+    // Count availability events per user
+    const availCountMap = {};
+    for (const id of recentIds) availCountMap[id] = 0;
+    for (const e of (recentAvailEvents || [])) {
+      if (availCountMap[e.user_id] !== undefined) availCountMap[e.user_id]++;
+    }
+
+    for (const u of recentUsers) {
+      u.friend_count = friendCountMap[u.id] ?? 0;
+      u.availability_count = availCountMap[u.id] ?? 0;
+    }
+  }
+
   const uniqueUsersWithFriends = new Set();
   if (usersWithFriendsRaw) {
     for (const f of usersWithFriendsRaw) {
