@@ -240,11 +240,12 @@ export default function ProfilePage() {
         }
       );
       if (!res.ok) throw new Error(await res.text());
-      // Clear session and local storage
+      // Clear session and local storage — layout's onAuthStateChange will
+      // handle the UI transition to <AuthPage /> without a page reload.
       try {
         Object.keys(localStorage).forEach((k) => localStorage.removeItem(k));
       } catch {}
-      window.location.href = "/";
+      try { await supabase.auth.signOut({ scope: "local" }); } catch {}
     } catch {
       feedbackError();
       toast("Failed to delete account — please try again");
@@ -254,17 +255,20 @@ export default function ProfilePage() {
   };
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch {}
-    // Clear all Supabase session keys from localStorage so the next
-    // load starts completely unauthenticated regardless of signOut result.
+    // Clear all Supabase session keys from localStorage first so the session
+    // is gone regardless of whether signOut succeeds (network may be offline).
     try {
       Object.keys(localStorage)
         .filter((k) => k.startsWith("sb-"))
         .forEach((k) => localStorage.removeItem(k));
     } catch {}
-    window.location.href = "/";
+    // signOut triggers onAuthStateChange(SIGNED_OUT) in layout.tsx which sets
+    // authed=false and renders <AuthPage /> — no page reload needed.
+    // If signOut fails (e.g. expired token), the localStorage wipe above means
+    // the next fetchProfile call will still see no session and sign the user out.
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {}
   };
 
   if (!user) return null;
