@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { cacheRead, cacheWrite } from "@/app/_lib/cache";
 import { useApp } from "../layout";
@@ -37,42 +37,44 @@ function timeToMinutes(t: string): number {
  * Convert a "HH:MM" time string from a source timezone into the viewer's
  * local timezone, returning a new "HH:MM" string.
  *
- * Strategy: anchor to a fixed reference date (a Monday, day 0 of our week
- * logic doesn't matter here — we only care about the clock time offset).
- * Build a Date in the source tz, then read back the hours/minutes in local tz.
+ * Strategy: construct a Date that represents "this HH:MM on a fixed reference
+ * day in sourceTz", then read back the hours and minutes in local time.
+ * Uses Temporal-style Intl tricks to find the UTC instant that corresponds to
+ * the given wall-clock time in sourceTz, which correctly handles all offsets
+ * including half-hour (India +5:30) and 45-minute (Nepal +5:45) zones.
  */
 function convertTimeToLocal(time: string, sourceTz: string): string {
   if (!sourceTz || sourceTz === "UTC") {
-    // If no timezone info, fall back to treating the time as local (old behavior)
     return time;
   }
   try {
     const [h, m] = time.split(":").map(Number);
-    // Use a fixed reference date — timezone offsets are day-independent for our purposes
-    const refDate = "2024-01-15"; // A Monday
-    // Build an ISO string representing this time in the source timezone
-    // by finding what UTC time corresponds to h:mm in sourceTz
-    const sourceStr = `${refDate}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
-    // Parse as if it's in sourceTz using a trick: format a known UTC time
-    // and find the offset. We use the Intl API to get the UTC equivalent.
-    const parts = new Intl.DateTimeFormat("en-US", {
+    if (isNaN(h) || isNaN(m)) return time;
+
+    // Use a fixed reference date unlikely to straddle a DST boundary mid-day
+    const refDate = "2024-01-15"; // A Monday in northern-hemisphere winter
+
+    // Step 1: find the UTC offset of sourceTz on the reference date by
+    // formatting a known UTC noon and reading back the local hour/minute.
+    const noonUTC = new Date(`${refDate}T12:00:00Z`);
+    const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: sourceTz,
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour: "2-digit", minute: "2-digit",
       hour12: false,
-    }).formatToParts(new Date(`${refDate}T12:00:00Z`));
+    }).formatToParts(noonUTC);
+    const srcHour = parseInt(parts.find(p => p.type === "hour")?.value ?? "12");
+    const srcMin  = parseInt(parts.find(p => p.type === "minute")?.value ?? "0");
+    // offset = (sourceTz wall clock) - UTC, in minutes
+    const offsetMinutes = (srcHour === 24 ? 0 : srcHour) * 60 + srcMin - 12 * 60;
 
-    const getPart = (type: string) => parts.find(p => p.type === type)?.value ?? "0";
-    // Offset = local wall clock - UTC. We know UTC is 12:00, read back local.
-    const tzHour = parseInt(getPart("hour"));
-    const tzMin  = parseInt(getPart("minute"));
-    const offsetMinutes = (tzHour === 24 ? 0 : tzHour) * 60 + tzMin - 12 * 60;
+    // Step 2: compute the UTC instant for h:mm in sourceTz
+    const utcMins = h * 60 + m - offsetMinutes;
 
-    // Apply offset to get UTC minutes, then apply local offset to get local time
-    const localOffset = -new Date().getTimezoneOffset(); // in minutes, positive = ahead of UTC
-    const totalMins = h * 60 + m - offsetMinutes + localOffset;
+    // Step 3: convert that UTC instant to local time
+    const localOffset = -new Date().getTimezoneOffset(); // minutes ahead of UTC
+    const localMins = utcMins + localOffset;
     // Wrap to [0, 1440)
-    const wrapped = ((totalMins % 1440) + 1440) % 1440;
+    const wrapped = ((localMins % 1440) + 1440) % 1440;
     const lh = Math.floor(wrapped / 60);
     const lm = wrapped % 60;
     return `${String(lh).padStart(2, "0")}:${String(lm).padStart(2, "0")}`;
@@ -111,7 +113,8 @@ interface FriendWindow extends AvailabilityWindow {
 
 export default function SchedulePage() {
   const { user, toast, refreshKey } = useApp();
-  const supabase = createClient();
+  // Stable client instance — avoids creating a new client on every render
+  const supabase = useMemo(() => createClient(), []);
 
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [friendWindows, setFriendWindows] = useState<FriendWindow[]>([]);
@@ -693,7 +696,7 @@ export default function SchedulePage() {
               <button
                 onClick={() => {
                   if (addModal.start >= addModal.end) {
-                    setTimeError("End time must be after start time");
+                    setTimeError("End time must be after start time (windows must be within the same day)");
                     feedbackError();
                     return;
                   }

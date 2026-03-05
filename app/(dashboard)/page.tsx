@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { cacheRead, cacheWrite } from "@/app/_lib/cache";
 import { useApp } from "./layout";
@@ -47,7 +47,9 @@ function formatCountdown(until: string): string {
 
 export default function HomePage() {
   const { user, refreshUser, toast, refreshKey } = useApp();
-  const supabase = createClient();
+  // Stable client instance — avoids creating a new client on every render
+  // which could cause Realtime channel mismatches.
+  const supabase = useMemo(() => createClient(), []);
 
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [mood, setMood] = useState(user?.current_mood || "");
@@ -240,12 +242,13 @@ export default function HomePage() {
     }
   }, [user?.current_mood]);
 
-  // Countdown ticker — starts/clears based on effective availableUntil
+  // Countdown ticker — starts/clears based on effective availableUntil.
+  // Ticks every 15s so short timers (< 5 min) stay accurate.
   useEffect(() => {
     if (countdownRef.current) clearInterval(countdownRef.current);
 
     if (isAvailable && availableUntil) {
-      const tick = () => {
+      const tick = async () => {
         const ms = new Date(availableUntil).getTime() - Date.now();
         if (ms <= 0) {
           // Expired — turn off automatically
@@ -253,19 +256,25 @@ export default function HomePage() {
           clearInterval(countdownRef.current!);
           setLocalAvailable(false);
           setLocalAvailableUntil(null);
-          supabase
+          const { error } = await supabase
             .from("profiles")
             .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
-            .eq("id", user!.id)
-            .then(() => {
-              // useEffect watching user.is_available will clear local overrides once Realtime confirms
-            });
+            .eq("id", user!.id);
+          if (error) {
+            // DB write failed — roll back local override so the UI doesn't
+            // show unavailable while the server still thinks the user is available.
+            setLocalAvailable(null);
+            setLocalAvailableUntil(undefined);
+            toast("Couldn't turn off availability — check your connection");
+          }
+          // On success: useEffect watching user.is_available will clear local
+          // overrides once Realtime confirms the update.
         } else {
           setCountdown(formatCountdown(availableUntil));
         }
       };
       tick();
-      countdownRef.current = setInterval(tick, 60000); // update every 60s (once per minute)
+      countdownRef.current = setInterval(tick, 15000); // tick every 15s for accuracy
     } else {
       setCountdown(null);
     }

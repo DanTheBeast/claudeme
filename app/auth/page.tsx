@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import {
   Mail,
@@ -52,7 +52,7 @@ export default function AuthPage() {
     }
   }, []);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -378,23 +378,21 @@ export default function AuthPage() {
 
               {!forgotMode && (
                 <button
-                  onClick={() => isReturning ? null : setStep(1)}
+                  onClick={() => {
+                    if (isReturning) {
+                      localStorage.removeItem(LAST_EMAIL_KEY);
+                      setEmail("");
+                      setStep(0);
+                      setMode("signup");
+                    } else {
+                      setStep(1);
+                    }
+                  }}
                   className="block mx-auto mt-4 text-gray-400 text-sm hover:text-gray-600 transition-colors"
                 >
-                  {isReturning ? (
-                    <span
-                      onClick={() => {
-                        localStorage.removeItem(LAST_EMAIL_KEY);
-                        setEmail("");
-                        setStep(0);
-                        setMode("signup");
-                      }}
-                    >
-                      Not {savedEmail.split("@")[0]}? Sign in with a different account
-                    </span>
-                  ) : (
-                    "← Back"
-                  )}
+                  {isReturning
+                    ? `Not ${savedEmail.split("@")[0]}? Sign in with a different account`
+                    : "← Back"}
                 </button>
               )}
             </div>

@@ -16,7 +16,10 @@ export function initSentry() {
     // Only trace 10% of sessions for performance — adjust up if needed.
     tracesSampleRate: 0.1,
     // Tag every event with the release so you can filter by version.
-    release: "callme@1.3.0",
+    // Falls back to a literal only if the env var isn't set at build time.
+    release: process.env.NEXT_PUBLIC_APP_VERSION
+      ? `callme@${process.env.NEXT_PUBLIC_APP_VERSION}`
+      : "callme@unknown",
     // "production" vs "development" — lets you filter noise in the dashboard.
     environment: process.env.NODE_ENV === "production" ? "production" : "development",
     // Don't send events in development so you don't pollute the dashboard.

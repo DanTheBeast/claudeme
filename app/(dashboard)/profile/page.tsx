@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackError, soundsEnabled, setSoundsEnabled } from "@/app/_lib/haptics";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { useApp } from "../layout";
+import type { Profile } from "@/app/_lib/types";
 import { Avatar } from "@/app/_components/avatar";
 import {
   LogOut,
@@ -62,7 +63,8 @@ function resizeImage(file: File, maxPx: number, quality: number): Promise<Blob> 
 
 export default function ProfilePage() {
   const { user, refreshUser, toast } = useApp();
-  const supabase = createClient();
+  // Stable client instance — avoids creating a new client on every render
+  const supabase = useMemo(() => createClient(), []);
 
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [avatarBust, setAvatarBust] = useState<string | null>(null);
@@ -83,17 +85,27 @@ export default function ProfilePage() {
     username: user?.username || "",
   });
 
-  // Re-sync draft when user loads after mount (e.g. slow cold start)
+  // Re-sync draft whenever the DB values change — covers:
+  //   • Initial load (user goes from null → profile)
+  //   • refreshUser() after a successful save (DB value confirmed)
+  //   • refreshUser() after an error-revert (DB value may differ from what
+  //     was typed, so we re-align the draft to avoid a stale pre-revert value
+  //     being sent on the next save)
+  // We only update fields that aren't currently "dirty" (i.e. have no pending
+  // in-flight save) to avoid clobbering what the user is mid-typing.
   useEffect(() => {
-    if (user) {
-      setDraft({
-        display_name: user.display_name || "",
-        phone_number: user.phone_number || "",
-        current_mood: user.current_mood || "",
-        username: user.username || "",
-      });
-    }
-  }, [user?.id]);
+    if (!user) return;
+    // Only resync if not currently saving — savingRef is always current
+    if (savingRef.current) return;
+    setDraft({
+      display_name: user.display_name || "",
+      phone_number: user.phone_number || "",
+      current_mood: user.current_mood || "",
+      username: user.username || "",
+    });
+  // Each field individually so any DB-side change triggers a re-sync,
+  // not just a user ID change (which only fires on login/logout).
+  }, [user?.id, user?.display_name, user?.phone_number, user?.current_mood, user?.username]);
 
   // Auto-save on blur — called when any field loses focus.
   // If a save is already in-flight, queue the latest value and run it after.
@@ -420,7 +432,7 @@ export default function ProfilePage() {
             <Shield className="w-4 h-4" /> Settings
           </h3>
           {settings.map((s, i) => {
-            const isOn = (user as Record<string, unknown>)[s.key] as boolean;
+            const isOn = user[s.key as keyof Profile] as boolean;
             return (
               <div
                 key={s.key}

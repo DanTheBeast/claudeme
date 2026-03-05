@@ -15,12 +15,22 @@ export async function clearNotificationBadge(): Promise<void> {
 /**
  * Request permission, register for APNs, and return the device token.
  * Saves the token to Supabase push_tokens table.
+ *
+ * Safe to call once per app session — the caller guards with pushRegistered ref.
+ * We always call removeAllListeners first so that if this is somehow invoked
+ * more than once, stacked duplicate listeners don't accumulate.
  */
 export async function registerPushNotifications(
   userId: string,
   supabase: ReturnType<typeof import("./supabase-browser").createClient>
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
+
+  // Remove any previously registered listeners before adding new ones.
+  // This prevents duplicate listeners if registerPushNotifications is ever
+  // called more than once in a session (e.g. race between the 1s defer and
+  // the 3s fallback retry in layout).
+  try { await PushNotifications.removeAllListeners(); } catch {}
 
   // Add listeners BEFORE calling register()
   await PushNotifications.addListener("registration", async (token) => {
@@ -51,6 +61,8 @@ export async function registerPushNotifications(
   await PushNotifications.register();
 
   // Handle notification tap — deep link into the app.
+  // Only added after permission is confirmed so it never accumulates on
+  // devices where the user has denied notifications.
   // Only allow navigation to known internal paths to prevent open redirect.
   const ALLOWED_PATHS = ["/", "/friends", "/schedule", "/profile"];
   PushNotifications.addListener(

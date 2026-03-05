@@ -37,9 +37,18 @@ export function setSoundsEnabled(enabled: boolean): void {
 
 let ctx: AudioContext | null = null;
 
+// webkit-prefixed AudioContext for older iOS WKWebView versions
+interface WindowWithWebkit extends Window {
+  webkitAudioContext?: typeof AudioContext;
+}
+
 function getCtx(): AudioContext | null {
   if (typeof window === "undefined") return null;
-  if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  if (!ctx) {
+    const Ctor = window.AudioContext ?? (window as WindowWithWebkit).webkitAudioContext;
+    if (!Ctor) return null;
+    ctx = new Ctor();
+  }
   return ctx;
 }
 

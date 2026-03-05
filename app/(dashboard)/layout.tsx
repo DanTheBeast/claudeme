@@ -17,6 +17,7 @@ import AuthPage from "@/app/auth/page";
 import { soundAppLaunch } from "@/app/_lib/haptics";
 import { registerPushNotifications, clearNotificationBadge } from "@/app/_lib/push-notifications";
 import { initSentry, setSentryUser, clearSentryUser } from "@/app/_lib/sentry";
+import { cacheClear } from "@/app/_lib/cache";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { App as CapApp } from "@capacitor/app";
 
@@ -258,17 +259,17 @@ export default function DashboardLayout({
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // Capacitor app state — fires when returning from background on iOS
-    let appStateListener: { remove: () => void } | null = null;
-    CapApp.addListener("appStateChange", ({ isActive }) => {
+    // Capacitor app state — fires when returning from background on iOS.
+    // Await the promise immediately so the remove handle is available before
+    // the cleanup function runs — prevents a leak on fast unmounts.
+    const appStateListenerPromise = CapApp.addListener("appStateChange", ({ isActive }) => {
       if (isActive) handleForeground();
-    }).then((l) => { appStateListener = l; }).catch(() => {});
+    }).catch(() => null);
 
     // Handle callme:// deep links — fired when the website callback page opens
     // the app after email verification or password reset. The callback passes
     // the session tokens in the URL so we can sign the user in immediately.
-    let appUrlListener: { remove: () => void } | null = null;
-    CapApp.addListener("appUrlOpen", async (data: { url: string }) => {
+    const appUrlListenerPromise = CapApp.addListener("appUrlOpen", async (data: { url: string }) => {
       try {
         const url = new URL(data.url);
         const accessToken = url.searchParams.get("access_token");
@@ -279,7 +280,7 @@ export default function DashboardLayout({
           setRefreshKey((k) => k + 1);
         }
       } catch {}
-    }).then((l) => { appUrlListener = l; }).catch(() => {});
+    }).catch(() => null);
 
     // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load.
     // IMPORTANT: only act on explicit SIGNED_OUT — never set authed=false on
@@ -290,11 +291,17 @@ export default function DashboardLayout({
       if (!initialLoadDone.current) return;
 
       if (event === "SIGNED_OUT") {
+        // Clear per-user cache so a subsequent login doesn't see stale data
+        if (user) cacheClear(user.id);
         setUser(null);
         setAuthed(false);
         clearSentryUser();
         return;
       }
+
+      // TOKEN_REFRESHED fires every ~hour — no need to re-fetch the profile,
+      // the session is still valid and no user data has changed.
+      if (event === "TOKEN_REFRESHED") return;
 
       if (session?.user) {
         const { data } = await supabase
@@ -346,12 +353,16 @@ export default function DashboardLayout({
       clearTimeout(timeout);
       clearTimeout(pushRetry);
       document.removeEventListener("visibilitychange", handleVisibility);
-      appStateListener?.remove();
-      appUrlListener?.remove();
+      // Await the listener promises in the cleanup so remove() is always called,
+      // even if the component unmounted before the addListener promise resolved.
+      appStateListenerPromise.then((l) => l?.remove());
+      appUrlListenerPromise.then((l) => l?.remove());
       subscription.unsubscribe();
       channelPromise.then((ch) => { if (ch) supabase.removeChannel(ch); });
     };
-  }, []);
+  // fetchProfile and supabase are stable (useCallback/useMemo) so listing them
+  // here doesn't cause re-runs — it just satisfies exhaustive-deps correctly.
+  }, [fetchProfile, supabase]);
 
   const toast = useCallback((msg: string) => setToastMsg(msg), []);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { cacheRead, cacheWrite } from "@/app/_lib/cache";
 import { useApp } from "../layout";
@@ -26,7 +26,8 @@ import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
 export default function FriendsPage() {
   const { user, toast, refreshUser, refreshKey } = useApp();
-  const supabase = createClient();
+  // Stable client — avoids a new instance on every render
+  const supabase = useMemo(() => createClient(), []);
 
   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
   const [pendingRequests, setPendingRequests] = useState<
@@ -79,10 +80,13 @@ export default function FriendsPage() {
       ...(received || []).map((f) => ({ friendshipId: f.id, friendId: f.user_id, is_muted: f.is_muted ?? false })),
     ];
 
-    // Collect results into locals so we can cache them all at once
-    let newFriends: FriendWithProfile[] = friends; // keep existing on error
-    let newPending: (Friendship & { requester?: Profile })[] = pendingRequests;
-    let newOutgoing: (Friendship & { recipient?: Profile })[] = outgoingRequests;
+    // Always start from empty arrays — never fall back to stale closure state.
+    // If a sub-query fails we simply don't update that slice of state, which
+    // preserves whatever was last successfully loaded rather than reverting to
+    // an earlier snapshot from when this closure was created.
+    let newFriends: FriendWithProfile[] | null = null;
+    let newPending: (Friendship & { requester?: Profile })[] | null = null;
+    let newOutgoing: (Friendship & { recipient?: Profile })[] | null = null;
 
     if (friendEntries.length > 0) {
       const { data, error: profilesErr } = await supabase
@@ -154,11 +158,17 @@ export default function FriendsPage() {
       }
     }
 
-    // Apply all state updates and write cache atomically
-    setFriends(newFriends);
-    setPendingRequests(newPending);
-    setOutgoingRequests(newOutgoing);
-    cacheWrite("friends_page", user!.id, { friends: newFriends, pending: newPending, outgoing: newOutgoing });
+    // Only update state slices that actually loaded successfully — never
+    // overwrite good data with null on a partial failure.
+    if (newFriends !== null) setFriends(newFriends);
+    if (newPending !== null) setPendingRequests(newPending);
+    if (newOutgoing !== null) setOutgoingRequests(newOutgoing);
+
+    // Write cache with whatever we have — use functional reads to get current state
+    // rather than stale closure values.
+    if (newFriends !== null && newPending !== null && newOutgoing !== null) {
+      cacheWrite("friends_page", user.id, { friends: newFriends, pending: newPending, outgoing: newOutgoing });
+    }
     setLoading(false);
   };
 
@@ -182,15 +192,17 @@ export default function FriendsPage() {
 
   // Debounced search — only shows users who allow friend requests,
   // and filters out people already friended or with a pending request.
+  // Uses refs for friends/pendingRequests so the timer isn't restarted by
+  // background loadData calls — only the search query itself restarts the timer.
   useEffect(() => {
     if (searchQuery.length < 2) { setSearchResults([]); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
 
-      // Build exclusion list: self + existing friends + pending requests (both directions)
+      // Build exclusion list from refs — always current without being deps
       const existingIds = new Set<string>([user?.id || ""]);
-      friends.forEach((f) => existingIds.add(f.friend.id));
-      pendingRequests.forEach((r) => existingIds.add(r.user_id));
+      friendsRef.current.forEach((f) => existingIds.add(f.friend.id));
+      pendingRequestsRef.current.forEach((r) => existingIds.add(r.user_id));
 
       // Also fetch outgoing pending requests the current user sent
       const { data: outgoing } = await supabase
@@ -238,10 +250,10 @@ export default function FriendsPage() {
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
-  // Include friends and pendingRequests so the exclusion list is always current.
-  // Without these, accepting a request while the search box is open would still
-  // show that person as an "Add" result until the component re-mounts.
-  }, [searchQuery, friends, pendingRequests]);
+  // Only searchQuery restarts the debounce timer. friends/pendingRequests are
+  // read from refs inside the async body so they're always current without
+  // causing the timer to cancel mid-type on every background reload.
+  }, [searchQuery]);
 
   const sendFriendRequest = async (recipientId: string) => {
     if (!user || sendingRequest === recipientId) return;
@@ -335,6 +347,14 @@ export default function FriendsPage() {
       window.open(`sms:?&body=${encodeURIComponent(inviteText)}`, "_self");
     }
   };
+
+  // Keep a ref to the latest friends/pendingRequests so the search debounce
+  // can read current exclusion IDs without those values being in its deps
+  // (which would cancel and restart the 300ms timer on every loadData call).
+  const friendsRef = useRef(friends);
+  const pendingRequestsRef = useRef(pendingRequests);
+  useEffect(() => { friendsRef.current = friends; }, [friends]);
+  useEffect(() => { pendingRequestsRef.current = pendingRequests; }, [pendingRequests]);
 
   const [friendFilter, setFriendFilter] = useState("");
 
