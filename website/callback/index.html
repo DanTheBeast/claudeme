@@ -207,8 +207,28 @@
     const refreshToken = getParam('refresh_token') || '';
     const token       = getParam('token'); // older OTP style
     const tokenHash   = getParam('token_hash');
+    const code        = getParam('code'); // PKCE flow
 
     async function init() {
+      // ── PKCE code exchange (Supabase's current default flow) ───────────────
+      // Supabase sends ?code=<pkce_code> for email confirmation and recovery
+      // when the project is in PKCE mode. Exchange it for a session first,
+      // then branch on the resulting session type.
+      if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) { show('state-error'); return; }
+        const at = data?.session?.access_token || '';
+        const rt = data?.session?.refresh_token || '';
+        // If Supabase included a type hint, honour it; otherwise treat as signup
+        const resolvedType = type || 'signup';
+        if (resolvedType === 'recovery') {
+          show('state-reset');
+        } else {
+          showSuccess(resolvedType, at, rt);
+        }
+        return;
+      }
+
       // ── Password recovery ──────────────────────────────────────────────────
       if (type === 'recovery') {
         if (accessToken) {

@@ -123,6 +123,7 @@ export default function DashboardLayout({
   const pushRegistered = useRef(false);
   const splashHidden = useRef(false);
   const foregroundBusy = useRef(false);
+  const backgroundedAt = useRef<number | null>(null);
 
   const hideSplash = useCallback(async () => {
     if (splashHidden.current) return;
@@ -238,6 +239,18 @@ export default function DashboardLayout({
       // on iOS foreground. Only let one through at a time.
       if (foregroundBusy.current) return;
       foregroundBusy.current = true;
+
+      // If the app was backgrounded for more than 5 minutes, the WKWebView JS
+      // context may be in a stale/suspended state — pending promises and timers
+      // can be frozen, leaving spinners stuck and buttons unresponsive. A hard
+      // reload is the safest recovery: it takes ~1s and guarantees a clean slate.
+      const bgDuration = backgroundedAt.current ? Date.now() - backgroundedAt.current : 0;
+      backgroundedAt.current = null;
+      if (bgDuration > 5 * 60 * 1000) {
+        window.location.reload();
+        return;
+      }
+
       try {
         // Refresh the session first in case the token expired while backgrounded,
         // then re-fetch the profile so queries don't fail with auth errors.
@@ -253,9 +266,17 @@ export default function DashboardLayout({
       }
     };
 
+    const handleBackground = () => {
+      backgroundedAt.current = Date.now();
+    };
+
     // visibilitychange covers web/browser; appStateChange covers native iOS background→foreground
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") handleForeground();
+      if (document.visibilityState === "visible") {
+        handleForeground();
+      } else {
+        handleBackground();
+      }
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
@@ -263,7 +284,7 @@ export default function DashboardLayout({
     // Await the promise immediately so the remove handle is available before
     // the cleanup function runs — prevents a leak on fast unmounts.
     const appStateListenerPromise = CapApp.addListener("appStateChange", ({ isActive }) => {
-      if (isActive) handleForeground();
+      if (isActive) handleForeground(); else handleBackground();
     }).catch(() => null);
 
     // Handle callme:// deep links — fired when the website callback page opens

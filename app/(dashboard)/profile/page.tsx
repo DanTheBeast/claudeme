@@ -400,9 +400,26 @@ export default function ProfilePage() {
               <input
                 className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
                 value={draft.phone_number}
-                onChange={(e) => setDraft({ ...draft, phone_number: e.target.value })}
+                onChange={(e) => {
+                  // Format as US phone number while typing: (555) 123-4567
+                  // Strip everything except digits and leading +
+                  const raw = e.target.value;
+                  const digits = raw.replace(/\D/g, "");
+                  let formatted = raw;
+                  // Only auto-format if it looks like a US number (no leading +)
+                  if (!raw.startsWith("+") && digits.length <= 10) {
+                    if (digits.length <= 3) {
+                      formatted = digits.length ? `(${digits}` : "";
+                    } else if (digits.length <= 6) {
+                      formatted = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+                    } else {
+                      formatted = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+                    }
+                  }
+                  setDraft({ ...draft, phone_number: formatted });
+                }}
                 onBlur={(e) => saveField("phone_number", e.target.value)}
-                placeholder="+1 (555) 123-4567"
+                placeholder="(555) 123-4567"
                 type="tel"
               />
               {!user.phone_number && (
