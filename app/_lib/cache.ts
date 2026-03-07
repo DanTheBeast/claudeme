@@ -46,11 +46,6 @@ export function cacheWrite<T>(key: string, userId: string, data: T): void {
 }
 
 /**
- * Wraps a promise with a timeout. If the promise doesn't resolve within
- * `ms` milliseconds, rejects with a TimeoutError. Use this to ensure every
- * Supabase call that gates a UI loading state has a guaranteed exit path.
- */
-/**
  * Wraps a promise (or PromiseLike, e.g. Supabase query builders) with a
  * timeout. If it doesn't resolve within `ms` milliseconds, rejects with a
  * TimeoutError. Use this to ensure every Supabase call that gates a UI

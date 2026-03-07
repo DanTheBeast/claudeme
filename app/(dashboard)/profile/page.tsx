@@ -137,7 +137,7 @@ export default function ProfilePage() {
     }
     if (error) {
       feedbackError();
-      if (field === "username") {
+      if (field === "username" && error.message !== "Request timed out") {
         toast("Username already taken");
         setDraft((d) => ({ ...d, username: user.username || "" }));
       } else {
@@ -196,6 +196,8 @@ export default function ProfilePage() {
         ? "Photo took too long to process — try again"
         : errMsg === "Image load failed" || errMsg === "Canvas context unavailable"
         ? "Couldn't process that photo — try a different one"
+        : errMsg === "Request timed out"
+        ? "Photo uploaded but profile update timed out — try again"
         : "Failed to upload photo";
       toast(msg);
       feedbackError();

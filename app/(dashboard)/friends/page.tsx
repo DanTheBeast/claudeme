@@ -72,7 +72,6 @@ export default function FriendsPage() {
 
     if (sentError || receivedError) {
       // Don't wipe existing data on re-fetch failure (e.g. session mid-refresh)
-      setLoading(false);
       return;
     }
 
@@ -90,10 +89,10 @@ export default function FriendsPage() {
     let newOutgoing: (Friendship & { recipient?: Profile })[] | null = null;
 
     if (friendEntries.length > 0) {
-      const { data, error: profilesErr } = await supabase
+      const { data, error: profilesErr } = await withTimeout(supabase
         .from("profiles")
         .select("*")
-        .in("id", friendEntries.map((e) => e.friendId));
+        .in("id", friendEntries.map((e) => e.friendId)));
 
       if (!profilesErr) {
         const profiles = (data || []) as Profile[];
@@ -112,19 +111,19 @@ export default function FriendsPage() {
     }
 
     // Pending incoming requests
-    const { data: incoming, error: incomingErr } = await supabase
+    const { data: incoming, error: incomingErr } = await withTimeout(supabase
       .from("friendships")
       .select("*")
       .eq("friend_id", user.id)
-      .eq("status", "pending");
+      .eq("status", "pending"));
 
     if (!incomingErr) {
       if (incoming && incoming.length > 0) {
         const requesterIds = incoming.map((r) => r.user_id);
-        const { data: requesterProfiles } = await supabase
+        const { data: requesterProfiles } = await withTimeout(supabase
           .from("profiles")
           .select("*")
-          .in("id", requesterIds);
+          .in("id", requesterIds));
         newPending = incoming.map((r) => ({
           ...r,
           is_muted: r.is_muted ?? false,
@@ -136,19 +135,19 @@ export default function FriendsPage() {
     }
 
     // Pending outgoing requests sent by current user
-    const { data: outgoing, error: outgoingErr } = await supabase
+    const { data: outgoing, error: outgoingErr } = await withTimeout(supabase
       .from("friendships")
       .select("*")
       .eq("user_id", user.id)
-      .eq("status", "pending");
+      .eq("status", "pending"));
 
     if (!outgoingErr) {
       if (outgoing && outgoing.length > 0) {
         const recipientIds = outgoing.map((r) => r.friend_id);
-        const { data: recipientProfiles } = await supabase
+        const { data: recipientProfiles } = await withTimeout(supabase
           .from("profiles")
           .select("*")
-          .in("id", recipientIds);
+          .in("id", recipientIds));
         newOutgoing = outgoing.map((r) => ({
           ...r,
           is_muted: r.is_muted ?? false,

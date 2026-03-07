@@ -13,6 +13,7 @@ export default function CallbackPage() {
   const [message, setMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
   useEffect(() => {
+    let unmounted = false;
     const handleCallback = async () => {
       // Supabase puts recovery tokens in the URL hash as:
       // #access_token=...&type=recovery  (PKCE flow)
@@ -27,6 +28,7 @@ export default function CallbackPage() {
       // Wrap the whole thing in a timeout so the "Just a moment…" screen
       // never hangs forever on a dead or slow network.
       const timeout = setTimeout(() => {
+        if (unmounted) return;
         setStatus("error");
         setTimeout(() => { window.location.href = "/auth?error=callback_failed"; }, 2000);
       }, 12000);
@@ -78,6 +80,7 @@ export default function CallbackPage() {
     };
 
     handleCallback();
+    return () => { unmounted = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleResetPassword = async (e: React.FormEvent) => {
