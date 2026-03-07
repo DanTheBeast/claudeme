@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
-import { cacheRead, cacheWrite } from "@/app/_lib/cache";
+import { cacheRead, cacheWrite, withTimeout } from "@/app/_lib/cache";
 import { useApp } from "./layout";
 import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick, feedbackError } from "@/app/_lib/haptics";
 import { FriendCard } from "@/app/_components/friend-card";
@@ -107,84 +107,83 @@ export default function HomePage() {
 
     // Returns true on success, false on failure — so caller can retry
     async function loadFriends(): Promise<boolean> {
-      const { data: sentData, error: sentErr } = await supabase
-        .from("friendships")
-        .select("id, status, friend_id, is_muted")
-        .eq("user_id", user!.id)
-        .eq("status", "accepted");
+      try {
+        const { data: sentData, error: sentErr } = await withTimeout(supabase
+          .from("friendships")
+          .select("id, status, friend_id, is_muted")
+          .eq("user_id", user!.id)
+          .eq("status", "accepted"));
 
-      const { data: receivedData, error: receivedErr } = await supabase
-        .from("friendships")
-        .select("id, status, user_id, is_muted")
-        .eq("friend_id", user!.id)
-        .eq("status", "accepted");
+        const { data: receivedData, error: receivedErr } = await withTimeout(supabase
+          .from("friendships")
+          .select("id, status, user_id, is_muted")
+          .eq("friend_id", user!.id)
+          .eq("status", "accepted"));
 
-      if (sentErr || receivedErr) {
-        setLoadingFriends(false);
-        return false;
-      }
+        if (sentErr || receivedErr) return false;
 
-      const friendIds = [
-        ...(sentData || []).map((f) => f.friend_id),
-        ...(receivedData || []).map((f) => f.user_id),
-      ];
+        const friendIds = [
+          ...(sentData || []).map((f) => f.friend_id),
+          ...(receivedData || []).map((f) => f.user_id),
+        ];
 
-      if (friendIds.length === 0) {
-        setFriends([]);
-        cacheWrite("home_friends", user!.id, []);
-        friendsLoadedOnce.current = true;
-        setLoadingFriends(false);
-        return true;
-      }
-
-      const { data: profiles, error: profilesErr } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", friendIds);
-
-      if (profilesErr) {
-        setLoadingFriends(false);
-        return false;
-      }
-
-      const allFriendships = [...(sentData || []), ...(receivedData || [])];
-      const result: FriendWithProfile[] = (profiles || []).map((p) => {
-        const friendship = allFriendships.find(
-          (f) =>
-            ("friend_id" in f && f.friend_id === p.id) ||
-            ("user_id" in f && f.user_id === p.id)
-        );
-        // Respect show_online_status — if the friend has hidden their status,
-        // treat them as unavailable so they don't show in the "Available now" section.
-        const friend = p as Profile;
-        if (!friend.show_online_status) {
-          friend.is_available = false;
+        if (friendIds.length === 0) {
+          setFriends([]);
+          cacheWrite("home_friends", user!.id, []);
+          friendsLoadedOnce.current = true;
+          return true;
         }
-        // Local expiry — if available_until has passed, treat as unavailable.
-        // The friend's phone will have written is_available=false to the DB already,
-        // but the DB row may not have updated yet if their app was backgrounded.
-        if (friend.is_available && friend.available_until) {
-          if (new Date(friend.available_until).getTime() < Date.now()) {
+
+        const { data: profiles, error: profilesErr } = await withTimeout(supabase
+          .from("profiles")
+          .select("*")
+          .in("id", friendIds));
+
+        if (profilesErr) return false;
+
+        const allFriendships = [...(sentData || []), ...(receivedData || [])];
+        const result: FriendWithProfile[] = (profiles || []).map((p) => {
+          const friendship = allFriendships.find(
+            (f) =>
+              ("friend_id" in f && f.friend_id === p.id) ||
+              ("user_id" in f && f.user_id === p.id)
+          );
+          // Respect show_online_status — if the friend has hidden their status,
+          // treat them as unavailable so they don't show in the "Available now" section.
+          const friend = p as Profile;
+          if (!friend.show_online_status) {
             friend.is_available = false;
-            friend.available_until = null;
           }
-        }
-        return {
-          id: friendship?.id || 0,
-          status: "accepted",
-          is_muted: (friendship as { is_muted?: boolean } | undefined)?.is_muted ?? false,
-          friend,
-        };
-      });
+          // Local expiry — if available_until has passed, treat as unavailable.
+          // The friend's phone will have written is_available=false to the DB already,
+          // but the DB row may not have updated yet if their app was backgrounded.
+          if (friend.is_available && friend.available_until) {
+            if (new Date(friend.available_until).getTime() < Date.now()) {
+              friend.is_available = false;
+              friend.available_until = null;
+            }
+          }
+          return {
+            id: friendship?.id || 0,
+            status: "accepted",
+            is_muted: (friendship as { is_muted?: boolean } | undefined)?.is_muted ?? false,
+            friend,
+          };
+        });
 
-      setFriends(result);
-      cacheWrite("home_friends", user!.id, result);
-      friendsLoadedOnce.current = true;
-      setLoadingFriends(false);
-      return true;
+        setFriends(result);
+        cacheWrite("home_friends", user!.id, result);
+        friendsLoadedOnce.current = true;
+        return true;
+      } catch {
+        // Network timeout or unexpected error
+        return false;
+      } finally {
+        setLoadingFriends(false);
+      }
     }
 
-    // Run fetch; if it fails (auth not ready on boot), retry once after 2s.
+    // Run fetch; if it fails (auth not ready on boot or timeout), retry once after 2s.
     // Store the timer handle so it can be cancelled if the component unmounts
     // before the retry fires (e.g. user signs out or navigates away).
     loadFriends().then((ok) => {

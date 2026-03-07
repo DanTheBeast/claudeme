@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackError, soundsEnabled, setSoundsEnabled } from "@/app/_lib/haptics";
 import { createClient } from "@/app/_lib/supabase-browser";
+import { withTimeout } from "@/app/_lib/cache";
 import { useApp } from "../layout";
 import type { Profile } from "@/app/_lib/types";
 import { Avatar } from "@/app/_components/avatar";
@@ -124,12 +125,16 @@ export default function ProfilePage() {
     }
     savingRef.current = true;
     setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ [field]: value })
-      .eq("id", user.id);
-    savingRef.current = false;
-    setSaving(false);
+    let error: { message?: string } | null = null;
+    try {
+      const result = await withTimeout(supabase.from("profiles").update({ [field]: value }).eq("id", user.id));
+      error = result.error;
+    } catch {
+      error = { message: "Request timed out" };
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
     if (error) {
       feedbackError();
       if (field === "username") {
@@ -179,10 +184,7 @@ export default function ProfilePage() {
         .from("avatars")
         .getPublicUrl(path);
       const publicUrl = urlData.publicUrl;
-      await supabase
-        .from("profiles")
-        .update({ profile_picture: publicUrl })
-        .eq("id", user.id);
+      await withTimeout(supabase.from("profiles").update({ profile_picture: publicUrl }).eq("id", user.id));
       await refreshUser();
       setAvatarBust(String(Date.now()));
       toast("Photo updated!");
@@ -229,23 +231,32 @@ export default function ProfilePage() {
     setDeleting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${session?.access_token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      if (!res.ok) throw new Error(await res.text());
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 15000);
+      let res: Response;
+      try {
+        res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${session?.access_token}`,
+              "Content-Type": "application/json",
+            },
+            signal: controller.signal,
+          }
+        );
+      } finally {
+        clearTimeout(fetchTimeout);
+      }
+      if (!res!.ok) throw new Error(await res!.text());
       // Clear session and local storage — layout's onAuthStateChange will
       // handle the UI transition to <AuthPage /> without a page reload.
       try {
         Object.keys(localStorage).forEach((k) => localStorage.removeItem(k));
       } catch {}
       try { await supabase.auth.signOut({ scope: "local" }); } catch {}
+      // deleting stays true here intentionally — the UI is transitioning away
     } catch {
       feedbackError();
       toast("Failed to delete account — please try again");

@@ -58,45 +58,57 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { display_name: displayName },
-        emailRedirectTo: `https://justcallme.app/callback`,
-      },
-    });
-
-    if (error) {
-      setMessage({ type: "error", text: error.message });
-    } else {
-      saveLastEmail(email);
-      setMessage({
-        type: "success",
-        text: "Check your email for a confirmation link!",
-      });
+    try {
+      const { error } = await Promise.race([
+        supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { display_name: displayName },
+            emailRedirectTo: `https://justcallme.app/callback`,
+          },
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
+      ]);
+      if (error) {
+        setMessage({ type: "error", text: error.message });
+      } else {
+        saveLastEmail(email);
+        setMessage({ type: "success", text: "Check your email for a confirmation link!" });
+      }
+    } catch (err) {
+      const msg = err instanceof Error && err.message === "timeout"
+        ? "Request timed out — check your connection and try again"
+        : "Something went wrong — please try again";
+      setMessage({ type: "error", text: msg });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setMessage({ type: "error", text: error.message });
-    } else {
-      saveLastEmail(email);
-      setMessage({ type: "success", text: "Signed in! Loading..." });
+    try {
+      const { error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
+      ]);
+      if (error) {
+        setMessage({ type: "error", text: error.message });
+      } else {
+        saveLastEmail(email);
+        setMessage({ type: "success", text: "Signed in! Loading..." });
+      }
+    } catch (err) {
+      const msg = err instanceof Error && err.message === "timeout"
+        ? "Request timed out — check your connection and try again"
+        : "Something went wrong — please try again";
+      setMessage({ type: "error", text: msg });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -107,21 +119,25 @@ export default function AuthPage() {
     }
     setLoading(true);
     setMessage(null);
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `https://justcallme.app/callback`,
-    });
-
-    if (error) {
-      setMessage({ type: "error", text: error.message });
-    } else {
-      setMessage({
-        type: "success",
-        text: "Password reset email sent! Check your inbox.",
-      });
-      setForgotMode(false);
+    try {
+      const { error } = await Promise.race([
+        supabase.auth.resetPasswordForEmail(email, { redirectTo: `https://justcallme.app/callback` }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
+      ]);
+      if (error) {
+        setMessage({ type: "error", text: error.message });
+      } else {
+        setMessage({ type: "success", text: "Password reset email sent! Check your inbox." });
+        setForgotMode(false);
+      }
+    } catch (err) {
+      const msg = err instanceof Error && err.message === "timeout"
+        ? "Request timed out — check your connection and try again"
+        : "Something went wrong — please try again";
+      setMessage({ type: "error", text: msg });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

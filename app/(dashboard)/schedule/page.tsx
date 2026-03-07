@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
-import { cacheRead, cacheWrite } from "@/app/_lib/cache";
+import { cacheRead, cacheWrite, withTimeout } from "@/app/_lib/cache";
 import { useApp } from "../layout";
 import { feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
@@ -148,72 +148,77 @@ export default function SchedulePage() {
     let newFriendProfiles: Profile[] = friendProfiles;
     let newFriendWindows: FriendWindow[] = friendWindows;
 
-    // Load user's own windows
-    const { data, error: windowsErr } = await supabase
-      .from("availability_windows")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("day_of_week")
-      .order("start_time");
+    try {
+      // Load user's own windows
+      const { data, error: windowsErr } = await withTimeout(supabase
+        .from("availability_windows")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("day_of_week")
+        .order("start_time"));
 
-    if (!windowsErr) newWindows = (data || []) as AvailabilityWindow[];
+      if (!windowsErr) newWindows = (data || []) as AvailabilityWindow[];
 
-    // Load friends — exclude muted ones
-    const { data: sent, error: sentErr } = await supabase
-      .from("friendships")
-      .select("friend_id, is_muted")
-      .eq("user_id", user.id)
-      .eq("status", "accepted");
+      // Load friends — exclude muted ones
+      const { data: sent, error: sentErr } = await withTimeout(supabase
+        .from("friendships")
+        .select("friend_id, is_muted")
+        .eq("user_id", user.id)
+        .eq("status", "accepted"));
 
-    const { data: received, error: receivedErr } = await supabase
-      .from("friendships")
-      .select("user_id, is_muted")
-      .eq("friend_id", user.id)
-      .eq("status", "accepted");
+      const { data: received, error: receivedErr } = await withTimeout(supabase
+        .from("friendships")
+        .select("user_id, is_muted")
+        .eq("friend_id", user.id)
+        .eq("status", "accepted"));
 
-    if (!sentErr && !receivedErr) {
-      const friendIds = [
-        ...(sent || []).filter((f) => !f.is_muted).map((f) => f.friend_id),
-        ...(received || []).filter((f) => !f.is_muted).map((f) => f.user_id),
-      ];
+      if (!sentErr && !receivedErr) {
+        const friendIds = [
+          ...(sent || []).filter((f) => !f.is_muted).map((f) => f.friend_id),
+          ...(received || []).filter((f) => !f.is_muted).map((f) => f.user_id),
+        ];
 
-      if (friendIds.length > 0) {
-        const { data: profiles, error: profilesErr } = await supabase
-          .from("profiles")
-          .select("*")
-          .in("id", friendIds);
+        if (friendIds.length > 0) {
+          const { data: profiles, error: profilesErr } = await withTimeout(supabase
+            .from("profiles")
+            .select("*")
+            .in("id", friendIds));
 
-        const { data: fWindows, error: fWindowsErr } = await supabase
-          .from("availability_windows")
-          .select("*")
-          .in("user_id", friendIds)
-          .order("start_time");
+          const { data: fWindows, error: fWindowsErr } = await withTimeout(supabase
+            .from("availability_windows")
+            .select("*")
+            .in("user_id", friendIds)
+            .order("start_time"));
 
-        if (!profilesErr) newFriendProfiles = (profiles || []) as Profile[];
-        if (!fWindowsErr && !profilesErr) {
-          const profileMap = new Map(
-            (profiles || []).map((p: Profile) => [p.id, p])
-          );
-          newFriendWindows = (fWindows || []).map((w: AvailabilityWindow) => {
-            const friend = profileMap.get(w.user_id) as Profile | undefined;
-            const sourceTz = friend?.timezone || "UTC";
-            return {
-              ...w,
-              friend,
-              localStart: convertTimeToLocal(w.start_time, sourceTz),
-              localEnd:   convertTimeToLocal(w.end_time,   sourceTz),
-            };
-          });
+          if (!profilesErr) newFriendProfiles = (profiles || []) as Profile[];
+          if (!fWindowsErr && !profilesErr) {
+            const profileMap = new Map(
+              (profiles || []).map((p: Profile) => [p.id, p])
+            );
+            newFriendWindows = (fWindows || []).map((w: AvailabilityWindow) => {
+              const friend = profileMap.get(w.user_id) as Profile | undefined;
+              const sourceTz = friend?.timezone || "UTC";
+              return {
+                ...w,
+                friend,
+                localStart: convertTimeToLocal(w.start_time, sourceTz),
+                localEnd:   convertTimeToLocal(w.end_time,   sourceTz),
+              };
+            });
+          }
         }
       }
-    }
 
-    setWindows(newWindows);
-    setFriendProfiles(newFriendProfiles);
-    setFriendWindows(newFriendWindows);
-    cacheWrite("schedule_page", user.id, { windows: newWindows, friendWindows: newFriendWindows, friendProfiles: newFriendProfiles });
-    loadedOnce.current = true;
-    setLoading(false);
+      setWindows(newWindows);
+      setFriendProfiles(newFriendProfiles);
+      setFriendWindows(newFriendWindows);
+      cacheWrite("schedule_page", user.id, { windows: newWindows, friendWindows: newFriendWindows, friendProfiles: newFriendProfiles });
+    } catch {
+      // Network timeout or unexpected error — preserve existing data
+    } finally {
+      loadedOnce.current = true;
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

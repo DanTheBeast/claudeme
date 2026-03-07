@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
-import { cacheRead, cacheWrite } from "@/app/_lib/cache";
+import { cacheRead, cacheWrite, withTimeout } from "@/app/_lib/cache";
 import { useApp } from "../layout";
 import { feedbackFriendAdded, feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { Avatar } from "@/app/_components/avatar";
@@ -56,18 +56,19 @@ export default function FriendsPage() {
 
   const loadData = async () => {
     if (!user) return;
+    try {
 
-    const { data: sent, error: sentError } = await supabase
+    const { data: sent, error: sentError } = await withTimeout(supabase
       .from("friendships")
       .select("id, status, friend_id, is_muted")
       .eq("user_id", user.id)
-      .eq("status", "accepted");
+      .eq("status", "accepted"));
 
-    const { data: received, error: receivedError } = await supabase
+    const { data: received, error: receivedError } = await withTimeout(supabase
       .from("friendships")
       .select("id, status, user_id, is_muted")
       .eq("friend_id", user.id)
-      .eq("status", "accepted");
+      .eq("status", "accepted"));
 
     if (sentError || receivedError) {
       // Don't wipe existing data on re-fetch failure (e.g. session mid-refresh)
@@ -169,7 +170,11 @@ export default function FriendsPage() {
     if (newFriends !== null && newPending !== null && newOutgoing !== null) {
       cacheWrite("friends_page", user.id, { friends: newFriends, pending: newPending, outgoing: newOutgoing });
     }
-    setLoading(false);
+    } catch {
+      // Network timeout or unexpected error — don't wipe existing data
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -198,56 +203,61 @@ export default function FriendsPage() {
     if (searchQuery.length < 2) { setSearchResults([]); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
+      try {
+        // Build exclusion list from refs — always current without being deps
+        const existingIds = new Set<string>([user?.id || ""]);
+        friendsRef.current.forEach((f) => existingIds.add(f.friend.id));
+        pendingRequestsRef.current.forEach((r) => existingIds.add(r.user_id));
 
-      // Build exclusion list from refs — always current without being deps
-      const existingIds = new Set<string>([user?.id || ""]);
-      friendsRef.current.forEach((f) => existingIds.add(f.friend.id));
-      pendingRequestsRef.current.forEach((r) => existingIds.add(r.user_id));
+        // Also fetch outgoing pending requests the current user sent
+        const { data: outgoing } = await withTimeout(supabase
+          .from("friendships")
+          .select("friend_id")
+          .eq("user_id", user?.id || "")
+          .eq("status", "pending"));
+        (outgoing || []).forEach((r) => existingIds.add(r.friend_id));
 
-      // Also fetch outgoing pending requests the current user sent
-      const { data: outgoing } = await supabase
-        .from("friendships")
-        .select("friend_id")
-        .eq("user_id", user?.id || "")
-        .eq("status", "pending");
-      (outgoing || []).forEach((r) => existingIds.add(r.friend_id));
+        // Search by name/username always; email only if allow_phone_search is true.
+        // Both gated by allow_friend_requests so private users are never surfaced.
+        const excludeIds = Array.from(existingIds);
 
-      // Search by name/username always; email only if allow_phone_search is true.
-      // Both gated by allow_friend_requests so private users are never surfaced.
-      const excludeIds = Array.from(existingIds);
+        const nameQuery = supabase
+          .from("profiles")
+          .select("*")
+          .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
+          .eq("allow_friend_requests", true)
+          .limit(10);
 
-      const nameQuery = supabase
-        .from("profiles")
-        .select("*")
-        .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
-        .eq("allow_friend_requests", true)
-        .limit(10);
+        // Only apply exclusion filter if there are IDs to exclude —
+        // passing an empty array to .not("id","in",[]) causes a PostgREST error.
+        const { data } = excludeIds.length > 0
+          ? await withTimeout(nameQuery.not("id", "in", `(${excludeIds.join(",")})`))
+          : await withTimeout(nameQuery);
 
-      // Only apply exclusion filter if there are IDs to exclude —
-      // passing an empty array to .not("id","in",[]) causes a PostgREST error.
-      const { data } = excludeIds.length > 0
-        ? await nameQuery.not("id", "in", `(${excludeIds.join(",")})`)
-        : await nameQuery;
+        // Also search by email for users who allow it, then merge + deduplicate
+        const emailQuery = supabase
+          .from("profiles")
+          .select("*")
+          .ilike("email", `%${searchQuery}%`)
+          .eq("allow_friend_requests", true)
+          .eq("allow_phone_search", true)
+          .limit(10);
 
-      // Also search by email for users who allow it, then merge + deduplicate
-      const emailQuery = supabase
-        .from("profiles")
-        .select("*")
-        .ilike("email", `%${searchQuery}%`)
-        .eq("allow_friend_requests", true)
-        .eq("allow_phone_search", true)
-        .limit(10);
+        const { data: emailResults } = excludeIds.length > 0
+          ? await withTimeout(emailQuery.not("id", "in", `(${excludeIds.join(",")})`))
+          : await withTimeout(emailQuery);
 
-      const { data: emailResults } = excludeIds.length > 0
-        ? await emailQuery.not("id", "in", `(${excludeIds.join(",")})`)
-        : await emailQuery;
-
-      const merged = [...(data || [])];
-      for (const p of (emailResults || [])) {
-        if (!merged.find((r) => r.id === p.id)) merged.push(p);
+        const merged = [...(data || [])];
+        for (const p of (emailResults || [])) {
+          if (!merged.find((r) => r.id === p.id)) merged.push(p);
+        }
+        setSearchResults(merged.slice(0, 10) as Profile[]);
+      } catch {
+        // Timeout or network error — clear results so the user can retry
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
       }
-      setSearchResults(merged.slice(0, 10) as Profile[]);
-      setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
   // Only searchQuery restarts the debounce timer. friends/pendingRequests are
@@ -259,12 +269,19 @@ export default function FriendsPage() {
     if (!user || sendingRequest === recipientId) return;
     if (recipientId === user.id) return;
     setSendingRequest(recipientId);
-    const { error } = await supabase.from("friendships").insert({
-      user_id: user.id,
-      friend_id: recipientId,
-      status: "pending",
-    });
-    setSendingRequest(null);
+    let error: { message?: string } | null = null;
+    try {
+      const result = await withTimeout(supabase.from("friendships").insert({
+        user_id: user.id,
+        friend_id: recipientId,
+        status: "pending",
+      }));
+      error = result.error;
+    } catch {
+      error = { message: "Request timed out" };
+    } finally {
+      setSendingRequest(null);
+    }
     if (error) {
       feedbackError();
       toast("Failed to send request — maybe already sent?");

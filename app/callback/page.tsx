@@ -24,40 +24,57 @@ export default function CallbackPage() {
       const accessToken = hash.get("access_token");
       const code = query.get("code");
 
-      // ── Password reset flow ──────────────────────────────────────────────
-      if (type === "recovery") {
-        if (accessToken) {
-          // Set the session from the recovery token so updateUser works
+      // Wrap the whole thing in a timeout so the "Just a moment…" screen
+      // never hangs forever on a dead or slow network.
+      const timeout = setTimeout(() => {
+        setStatus("error");
+        setTimeout(() => { window.location.href = "/auth?error=callback_failed"; }, 2000);
+      }, 12000);
+
+      try {
+        // ── Password reset flow ──────────────────────────────────────────────
+        if (type === "recovery") {
+          if (accessToken) {
+            // Set the session from the recovery token so updateUser works
+            const refreshToken = hash.get("refresh_token") || "";
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          }
+          clearTimeout(timeout);
+          setStatus("reset");
+          return;
+        }
+
+        // ── OAuth / magic-link / email confirm flow ──────────────────────────
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error) {
+            clearTimeout(timeout);
+            setStatus("success");
+            setTimeout(() => { window.location.href = "/"; }, 800);
+            return;
+          }
+        }
+
+        // Hash-based session (magic link)
+        if (accessToken && type !== "recovery") {
           const refreshToken = hash.get("refresh_token") || "";
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          if (!error) {
+            clearTimeout(timeout);
+            setStatus("success");
+            setTimeout(() => { window.location.href = "/"; }, 800);
+            return;
+          }
         }
-        setStatus("reset");
-        return;
-      }
 
-      // ── OAuth / magic-link / email confirm flow ──────────────────────────
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (!error) {
-          setStatus("success");
-          setTimeout(() => { window.location.href = "/"; }, 800);
-          return;
-        }
+        clearTimeout(timeout);
+        setStatus("error");
+        setTimeout(() => { window.location.href = "/auth?error=callback_failed"; }, 2000);
+      } catch {
+        clearTimeout(timeout);
+        setStatus("error");
+        setTimeout(() => { window.location.href = "/auth?error=callback_failed"; }, 2000);
       }
-
-      // Hash-based session (magic link)
-      if (accessToken && type !== "recovery") {
-        const refreshToken = hash.get("refresh_token") || "";
-        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-        if (!error) {
-          setStatus("success");
-          setTimeout(() => { window.location.href = "/"; }, 800);
-          return;
-        }
-      }
-
-      setStatus("error");
-      setTimeout(() => { window.location.href = "/auth?error=callback_failed"; }, 2000);
     };
 
     handleCallback();
@@ -72,8 +89,20 @@ export default function CallbackPage() {
     setSaving(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.updateUser({ password });
-    setSaving(false);
+    let error: { message: string } | null = null;
+    try {
+      const result = await Promise.race([
+        supabase.auth.updateUser({ password }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10000)),
+      ]);
+      error = result.error;
+    } catch (err) {
+      error = { message: err instanceof Error && err.message === "timeout"
+        ? "Request timed out — check your connection"
+        : "Something went wrong — please try again" };
+    } finally {
+      setSaving(false);
+    }
 
     if (error) {
       setMessage({ type: "error", text: error.message });
