@@ -28,7 +28,13 @@ Deno.serve(async (req) => {
       );
       CREATE INDEX IF NOT EXISTS invite_codes_inviter_id_idx ON public.invite_codes(inviter_id);
       ALTER TABLE public.invite_codes ENABLE ROW LEVEL SECURITY;
-      DROP POLICY IF EXISTS "service role full access" ON public.invite_codes;
+
+      -- Anyone (including unauthenticated website visitors) can look up a code
+      -- to display the inviter's name on the landing page.
+      DROP POLICY IF EXISTS "public can read invite codes" ON public.invite_codes;
+      CREATE POLICY "public can read invite codes"
+        ON public.invite_codes FOR SELECT
+        USING (true);
     `);
     return new Response(JSON.stringify({ success: true }), {
       headers: { "Content-Type": "application/json" }
