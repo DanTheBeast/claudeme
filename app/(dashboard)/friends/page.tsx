@@ -215,50 +215,43 @@ export default function FriendsPage() {
     refreshUser(); // refreshes pending badge count
   };
 
-  // Called when the app is opened via a callme://invite?from=username deep link.
-  // Look up the inviter by username and send them a friend request.
-  const sendRequestByUsername = async (username: string) => {
+  // Called when the app is opened via a callme://invite?code=... deep link,
+  // or when a user enters a code manually. Routes through the redeem-invite-code
+  // Edge Function which validates the code and creates the friend request.
+  const redeemInviteCode = async (codeOrUsername: string) => {
     if (!user) return;
     setSendingInviteRequest(true);
     try {
-      const { data: profile, error: lookupErr } = await withTimeout(supabase
-        .from("profiles")
-        .select("id, display_name, allow_friend_requests")
-        .eq("username", username)
-        .single());
-      if (lookupErr || !profile) {
-        toast("Couldn't find that user — they may have deleted their account");
-        clearPendingInvite();
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code: codeOrUsername }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        toast(json.error || "Something went wrong — try again");
+        // Only clear banner for terminal errors (not retryable network issues)
+        if (res.status !== 500) clearPendingInvite();
         return;
       }
-      if (!profile.allow_friend_requests) {
-        toast(`${profile.display_name} isn't accepting friend requests right now`);
-        clearPendingInvite();
-        return;
-      }
-      if (profile.id === user.id) {
-        toast("That's your own invite link!");
-        clearPendingInvite();
-        return;
-      }
-      const { error } = await withTimeout(supabase.from("friendships").insert({
-        user_id: user.id,
-        friend_id: profile.id,
-        status: "pending",
-      }));
-      if (error) {
-        // Likely a duplicate — treat gracefully, still clear the banner
-        toast(`Request already sent to ${profile.display_name}`);
-        clearPendingInvite();
+      if (json.already_friends) {
+        toast(`You're already friends with @${json.inviter_username}!`);
       } else {
         feedbackFriendAdded();
-        toast(`Friend request sent to ${profile.display_name}! 🎉`);
-        clearPendingInvite();
-        loadData();
+        toast(`Friend request sent to @${json.inviter_username}! 🎉`);
       }
+      clearPendingInvite();
+      loadData();
     } catch {
-      // Network timeout or unexpected error — keep banner so user can retry
-      toast("Something went wrong — try again");
+      // Network error — keep banner so user can retry
+      toast("Something went wrong — check your connection and try again");
     } finally {
       setSendingInviteRequest(false);
     }
@@ -293,23 +286,32 @@ export default function FriendsPage() {
     toast(currentlyMuted ? `${name} unmuted` : `${name} muted — you won't see each other's availability`);
   };
 
+  const [generatingCode, setGeneratingCode] = useState(false);
+
   const inviteFriends = async () => {
-    // Personal invite link — includes the sender's username so the recipient
-    // lands on a page that knows who invited them and can send a request back.
-    const username = user?.username;
-    if (!username) {
-      toast("Set a username in your profile first");
-      return;
-    }
-    const inviteUrl = `https://justcallme.app/invite/${username}`;
-    const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Join me — tap the link and I'll get a friend request from you!\n\n${inviteUrl}`;
+    if (!user) return;
+    setGeneratingCode(true);
     try {
+      // Fetch a unique invite code from the server — stable per user until redeemed
+      const { data: { session } } = await createClient().auth.getSession();
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
+        { method: "POST", headers: { "Authorization": `Bearer ${session?.access_token}` } }
+      );
+      const json = await res.json();
+      if (!res.ok || !json.code) {
+        toast(json.error || "Couldn't generate invite link — try again");
+        return;
+      }
+      const inviteUrl = `https://justcallme.app/i/${json.code}`;
+      const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Join me — tap the link and I'll get a friend request from you!\n\n${inviteUrl}`;
       await Share.share({ title: "Join me on CallMe", text: inviteText, url: inviteUrl });
     } catch (err: unknown) {
-      // AbortError = user dismissed the share sheet — not an error
       if (err instanceof Error && err.name !== "AbortError") {
         toast("Couldn't open share sheet");
       }
+    } finally {
+      setGeneratingCode(false);
     }
   };
 
@@ -393,7 +395,7 @@ export default function FriendsPage() {
                 <X className="w-4 h-4" />
               </button>
               <button
-                onClick={() => sendRequestByUsername(pendingInviteFrom)}
+                onClick={() => redeemInviteCode(pendingInviteFrom)}
                 disabled={sendingInviteRequest}
                 className="callme-gradient text-white px-3.5 py-1.5 rounded-[10px] text-xs font-semibold disabled:opacity-60 flex items-center gap-1.5"
               >
@@ -664,36 +666,42 @@ export default function FriendsPage() {
           <UserPlus className="w-5 h-5" /> Add Friends
         </h3>
         <p className="text-sm text-gray-400 mb-6 leading-relaxed">
-          CallMe is invite-only. Send someone your personal link — when they join, they can send you a friend request directly.
+          CallMe is invite-only. Share your personal link — when someone taps it and signs up, you'll get a friend request from them.
         </p>
-
-        {/* Personal invite link */}
-        <div className="bg-gray-50 border border-gray-200 rounded-[16px] p-4 mb-4">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Your invite link</p>
-          <p className="text-sm font-mono text-gray-700 break-all">
-            justcallme.app/invite/{user?.username}
-          </p>
-        </div>
 
         <button
           onClick={() => { inviteFriends(); setShowAdd(false); }}
-          className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all mb-3"
+          disabled={generatingCode}
+          className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all mb-3 disabled:opacity-60"
         >
-          <Share2 className="w-4 h-4" /> Share My Link
+          {generatingCode
+            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generating link…</>
+            : <><Share2 className="w-4 h-4" /> Share My Invite Link</>
+          }
         </button>
 
         <button
+          disabled={generatingCode}
           onClick={async () => {
-            const url = `https://justcallme.app/invite/${user?.username}`;
+            setGeneratingCode(true);
             try {
-              await navigator.clipboard.writeText(url);
+              const { data: { session } } = await createClient().auth.getSession();
+              const res = await fetch(
+                `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
+                { method: "POST", headers: { "Authorization": `Bearer ${session?.access_token}` } }
+              );
+              const json = await res.json();
+              if (!res.ok || !json.code) { toast(json.error || "Couldn't generate link"); return; }
+              await navigator.clipboard.writeText(`https://justcallme.app/i/${json.code}`);
               toast("Link copied!");
               setShowAdd(false);
             } catch {
               toast("Couldn't copy — try sharing instead");
+            } finally {
+              setGeneratingCode(false);
             }
           }}
-          className="w-full bg-white border border-gray-200 text-gray-600 py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-all"
+          className="w-full bg-white border border-gray-200 text-gray-600 py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-all disabled:opacity-60"
         >
           <LinkIcon className="w-4 h-4" /> Copy Link
         </button>

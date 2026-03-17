@@ -18,6 +18,10 @@
     {
       "source": "/invite/:username",
       "destination": "/invite/index.html"
+    },
+    {
+      "source": "/i/:code",
+      "destination": "/i/index.html"
     }
   ]
 }

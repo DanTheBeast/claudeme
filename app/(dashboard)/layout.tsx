@@ -122,6 +122,10 @@ export default function DashboardLayout({
   const [pendingRequests, setPendingRequests] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [pendingInviteFrom, setPendingInviteFrom] = useState<string | null>(null);
+  const [showInviteCodePrompt, setShowInviteCodePrompt] = useState(false);
+  const [inviteCodeInput, setInviteCodeInput] = useState("");
+  const [redeemingCode, setRedeemingCode] = useState(false);
+  const invitePromptShown = useRef(false);
   const supabase = useMemo(() => createClient(), []);
   const launchJinglePlayed = useRef(false);
   const initialLoadDone = useRef(false);
@@ -179,6 +183,19 @@ export default function DashboardLayout({
         .eq("friend_id", session.user.id)
         .eq("status", "pending");
       setPendingRequests(count ?? 0);
+
+      // Show invite code prompt once for brand-new users (account < 10 min old,
+      // not already shown this session). Gives them a chance to connect with
+      // whoever invited them before they hit the empty friends list.
+      if (
+        !invitePromptShown.current &&
+        data?.created_at &&
+        Date.now() - new Date(data.created_at).getTime() < 10 * 60 * 1000
+      ) {
+        invitePromptShown.current = true;
+        // Small delay so the app finishes rendering first
+        setTimeout(() => setShowInviteCodePrompt(true), 1200);
+      }
 
       // Hide splash and play jingle as soon as profile is loaded —
       // defer everything else (push, realtime) so UI renders first
@@ -298,11 +315,13 @@ export default function DashboardLayout({
     const appUrlListenerPromise = CapApp.addListener("appUrlOpen", async (data: { url: string }) => {
       try {
         const url = new URL(data.url);
-        // callme://invite?from=username — opened from a personal invite link
+        // callme://invite?code=x7k2m9ab — opened from a personal invite link
         // url.host === "invite" because callme://invite parses "invite" as the host
         if (url.host === "invite") {
-          const from = url.searchParams.get("from");
-          if (from) setPendingInviteFrom(from);
+          const code = url.searchParams.get("code");
+          const from = url.searchParams.get("from"); // legacy support
+          if (code) setPendingInviteFrom(code);
+          else if (from) setPendingInviteFrom(from);
           return;
         }
         // callme://open?access_token=...&refresh_token=... — email verification callback
@@ -416,6 +435,83 @@ export default function DashboardLayout({
       <BottomNav pendingRequests={pendingRequests} />
       {toastMsg && (
         <Toast message={toastMsg} onDone={() => setToastMsg(null)} />
+      )}
+
+      {/* Invite code prompt — shown once to new users so they can connect
+          with whoever sent them the link before hitting the empty friends list */}
+      {showInviteCodePrompt && (
+        <div
+          className="fixed inset-0 z-[300] bg-black/40 backdrop-blur-[4px] flex items-end justify-center"
+          onClick={() => setShowInviteCodePrompt(false)}
+        >
+          <div
+            className="bg-white rounded-t-[28px] w-full max-w-md px-6 pt-3 pb-10 anim-slide-up"
+            style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mb-6" />
+            <h3 className="font-display text-xl font-bold mb-1">Got an invite code?</h3>
+            <p className="text-sm text-gray-400 mb-5 leading-relaxed">
+              If someone sent you a CallMe invite link, enter the code here to connect with them automatically.
+            </p>
+            <input
+              type="text"
+              value={inviteCodeInput}
+              onChange={(e) => setInviteCodeInput(e.target.value.toLowerCase().trim())}
+              placeholder="e.g. x7k2m9ab"
+              maxLength={12}
+              autoCorrect="off"
+              autoCapitalize="none"
+              className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
+            />
+            <button
+              disabled={inviteCodeInput.length < 4 || redeemingCode}
+              onClick={async () => {
+                setRedeemingCode(true);
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  const res = await fetch(
+                    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Authorization": `Bearer ${session?.access_token}`,
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({ code: inviteCodeInput }),
+                    }
+                  );
+                  const json = await res.json();
+                  if (!res.ok) {
+                    toast(json.error || "Invalid code — double-check and try again");
+                    return;
+                  }
+                  toast(json.already_friends
+                    ? `You're already friends with @${json.inviter_username}!`
+                    : `Friend request sent to @${json.inviter_username}! 🎉`
+                  );
+                  setShowInviteCodePrompt(false);
+                } catch {
+                  toast("Something went wrong — try again");
+                } finally {
+                  setRedeemingCode(false);
+                }
+              }}
+              className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 mb-3 hover:shadow-lg hover:shadow-callme/25 transition-all"
+            >
+              {redeemingCode
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Connecting…</>
+                : "Connect with Inviter"
+              }
+            </button>
+            <button
+              onClick={() => setShowInviteCodePrompt(false)}
+              className="w-full text-gray-400 text-sm py-2 hover:text-gray-600 transition-colors"
+            >
+              Skip — I&apos;ll add friends later
+            </button>
+          </div>
+        </div>
       )}
     </AppContext.Provider>
   );
