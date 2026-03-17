@@ -10,7 +10,6 @@ import { FriendCard } from "@/app/_components/friend-card";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
 import {
   Plus,
-  Search,
   UserPlus,
   UserMinus,
   X,
@@ -21,11 +20,13 @@ import {
   BellOff,
   Bell,
   Phone,
+  Link as LinkIcon,
 } from "lucide-react";
+import { Share } from "@capacitor/share";
 import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
 export default function FriendsPage() {
-  const { user, toast, refreshUser, refreshKey } = useApp();
+  const { user, toast, refreshUser, refreshKey, pendingInviteFrom, clearPendingInvite } = useApp();
   // Stable client — avoids a new instance on every render
   const supabase = useMemo(() => createClient(), []);
 
@@ -38,21 +39,11 @@ export default function FriendsPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [sendingRequest, setSendingRequest] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Profile[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [sendingInviteRequest, setSendingInviteRequest] = useState(false);
 
-  // Delay focus until after the bottom sheet slide-up animation (~300ms)
-  // to prevent iOS keyboard jumping mid-animation.
-  useEffect(() => {
-    if (!showAdd) return;
-    const t = setTimeout(() => searchInputRef.current?.focus(), 350);
-    return () => clearTimeout(t);
-  }, [showAdd]);
+
 
   const loadData = async () => {
     if (!user) return;
@@ -196,102 +187,7 @@ export default function FriendsPage() {
 
   // Debounced search — only shows users who allow friend requests,
   // and filters out people already friended or with a pending request.
-  // Uses refs for friends/pendingRequests so the timer isn't restarted by
-  // background loadData calls — only the search query itself restarts the timer.
-  useEffect(() => {
-    if (searchQuery.length < 2) { setSearchResults([]); return; }
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        // Build exclusion list from refs — always current without being deps
-        const existingIds = new Set<string>([user?.id || ""]);
-        friendsRef.current.forEach((f) => existingIds.add(f.friend.id));
-        pendingRequestsRef.current.forEach((r) => existingIds.add(r.user_id));
 
-        // Also fetch outgoing pending requests the current user sent
-        const { data: outgoing } = await withTimeout(supabase
-          .from("friendships")
-          .select("friend_id")
-          .eq("user_id", user?.id || "")
-          .eq("status", "pending"));
-        (outgoing || []).forEach((r) => existingIds.add(r.friend_id));
-
-        // Search by name/username always; email only if allow_phone_search is true.
-        // Both gated by allow_friend_requests so private users are never surfaced.
-        const excludeIds = Array.from(existingIds);
-
-        const nameQuery = supabase
-          .from("profiles")
-          .select("*")
-          .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
-          .eq("allow_friend_requests", true)
-          .limit(10);
-
-        // Only apply exclusion filter if there are IDs to exclude —
-        // passing an empty array to .not("id","in",[]) causes a PostgREST error.
-        const { data } = excludeIds.length > 0
-          ? await withTimeout(nameQuery.not("id", "in", `(${excludeIds.join(",")})`))
-          : await withTimeout(nameQuery);
-
-        // Also search by email for users who allow it, then merge + deduplicate
-        const emailQuery = supabase
-          .from("profiles")
-          .select("*")
-          .ilike("email", `%${searchQuery}%`)
-          .eq("allow_friend_requests", true)
-          .eq("allow_phone_search", true)
-          .limit(10);
-
-        const { data: emailResults } = excludeIds.length > 0
-          ? await withTimeout(emailQuery.not("id", "in", `(${excludeIds.join(",")})`))
-          : await withTimeout(emailQuery);
-
-        const merged = [...(data || [])];
-        for (const p of (emailResults || [])) {
-          if (!merged.find((r) => r.id === p.id)) merged.push(p);
-        }
-        setSearchResults(merged.slice(0, 10) as Profile[]);
-      } catch {
-        // Timeout or network error — clear results so the user can retry
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  // Only searchQuery restarts the debounce timer. friends/pendingRequests are
-  // read from refs inside the async body so they're always current without
-  // causing the timer to cancel mid-type on every background reload.
-  }, [searchQuery]);
-
-  const sendFriendRequest = async (recipientId: string) => {
-    if (!user || sendingRequest === recipientId) return;
-    if (recipientId === user.id) return;
-    setSendingRequest(recipientId);
-    let error: { message?: string } | null = null;
-    try {
-      const result = await withTimeout(supabase.from("friendships").insert({
-        user_id: user.id,
-        friend_id: recipientId,
-        status: "pending",
-      }));
-      error = result.error;
-    } catch {
-      error = { message: "Request timed out" };
-    } finally {
-      setSendingRequest(null);
-    }
-    if (error) {
-      feedbackError();
-      toast("Failed to send request — maybe already sent?");
-    } else {
-      feedbackFriendAdded();
-      toast("Friend request sent! 🎉");
-      setShowAdd(false);
-      setSearchQuery("");
-      loadData();
-    }
-  };
 
   const acceptRequest = async (requestId: number) => {
     feedbackSuccess();
@@ -317,6 +213,50 @@ export default function FriendsPage() {
     toast("Request declined");
     loadData();
     refreshUser(); // refreshes pending badge count
+  };
+
+  // Called when the app is opened via a callme://invite?from=username deep link.
+  // Look up the inviter by username and send them a friend request.
+  const sendRequestByUsername = async (username: string) => {
+    if (!user) return;
+    setSendingInviteRequest(true);
+    try {
+      const { data: profile, error: lookupErr } = await withTimeout(supabase
+        .from("profiles")
+        .select("id, display_name, allow_friend_requests")
+        .eq("username", username)
+        .single());
+      if (lookupErr || !profile) {
+        toast("Couldn't find that user — they may have deleted their account");
+        return;
+      }
+      if (!profile.allow_friend_requests) {
+        toast(`${profile.display_name} isn't accepting friend requests right now`);
+        return;
+      }
+      if (profile.id === user.id) {
+        toast("That's your own invite link!");
+        return;
+      }
+      const { error } = await withTimeout(supabase.from("friendships").insert({
+        user_id: user.id,
+        friend_id: profile.id,
+        status: "pending",
+      }));
+      if (error) {
+        // Likely already sent — don't show an error, it's not harmful
+        toast(`Request already sent to ${profile.display_name}`);
+      } else {
+        feedbackFriendAdded();
+        toast(`Friend request sent to ${profile.display_name}! 🎉`);
+        loadData();
+      }
+    } catch {
+      toast("Something went wrong — try again");
+    } finally {
+      setSendingInviteRequest(false);
+      clearPendingInvite();
+    }
   };
 
   const removeFriend = async (friendshipId: number, name: string) => {
@@ -349,18 +289,18 @@ export default function FriendsPage() {
   };
 
   const inviteFriends = async () => {
-    const inviteUrl = "https://justcallme.app";
-    const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Like you! Join me so we can easily find times to chat.\n\n${inviteUrl}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "Join me on CallMe", text: inviteText });
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name !== "AbortError") {
-          toast("Couldn't share — try copying the link instead");
-        }
+    // Personal invite link — includes the sender's username so the recipient
+    // lands on a page that knows who invited them and can send a request back.
+    const username = user?.username || "";
+    const inviteUrl = `https://justcallme.app/invite/${username}`;
+    const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Join me — tap the link and I'll get a friend request from you!\n\n${inviteUrl}`;
+    try {
+      await Share.share({ title: "Join me on CallMe", text: inviteText, url: inviteUrl });
+    } catch (err: unknown) {
+      // AbortError = user dismissed the share sheet — not an error
+      if (err instanceof Error && err.name !== "AbortError") {
+        toast("Couldn't open share sheet");
       }
-    } else {
-      window.open(`sms:?&body=${encodeURIComponent(inviteText)}`, "_self");
     }
   };
 
@@ -411,16 +351,15 @@ export default function FriendsPage() {
       <div style={{ height: "calc(env(safe-area-inset-top, 0px) + 56px)" }} />
 
       <main className="px-5 pt-5 flex flex-col gap-5">
-        {/* Filter bar — only shown when there are friends to filter */}
-        {friends.length > 0 && (
+        {/* Filter bar — only shown when there are enough friends to warrant filtering */}
+        {friends.length > 4 && (
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             <input
               type="text"
               value={friendFilter}
               onChange={(e) => setFriendFilter(e.target.value)}
               placeholder="Filter friends..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all"
+              className="w-full pl-4 pr-9 py-2.5 bg-white border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all"
             />
             {friendFilter && (
               <button
@@ -430,6 +369,37 @@ export default function FriendsPage() {
                 <X className="w-4 h-4" />
               </button>
             )}
+          </div>
+        )}
+
+        {/* Invite deep link banner — shown when app was opened via a personal invite link */}
+        {pendingInviteFrom && (
+          <div className="bg-callme-50 border border-callme/20 rounded-[18px] p-4 anim-fade-up flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full callme-gradient flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-gray-900">@{pendingInviteFrom} invited you</p>
+              <p className="text-xs text-gray-500 mt-0.5">Send them a friend request to connect</p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={clearPendingInvite}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => sendRequestByUsername(pendingInviteFrom)}
+                disabled={sendingInviteRequest}
+                className="callme-gradient text-white px-3.5 py-1.5 rounded-[10px] text-xs font-semibold disabled:opacity-60 flex items-center gap-1.5"
+              >
+                {sendingInviteRequest
+                  ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : <Check className="w-3 h-3" />}
+                {sendingInviteRequest ? "Sending…" : "Add"}
+              </button>
+            </div>
           </div>
         )}
 
@@ -581,7 +551,7 @@ export default function FriendsPage() {
                 onClick={() => setShowAdd(true)}
                 className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
               >
-                <Search className="w-4 h-4" /> Find Friends
+                <UserPlus className="w-4 h-4" /> Add Friends
               </button>
               <button
                 onClick={inviteFriends}
@@ -687,81 +657,43 @@ export default function FriendsPage() {
 
       {/* Add Friend Sheet */}
       <BottomSheet open={showAdd} onClose={() => setShowAdd(false)}>
-        <h3 className="font-display text-xl font-bold mb-5 flex items-center gap-2">
-          <Search className="w-5 h-5" /> Find Friends
+        <h3 className="font-display text-xl font-bold mb-2 flex items-center gap-2">
+          <UserPlus className="w-5 h-5" /> Add Friends
         </h3>
+        <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+          CallMe is invite-only. Send someone your personal link — when they join, they can send you a friend request directly.
+        </p>
 
-        <div className="relative mb-4">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, username, or email..."
-            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme bg-gray-50/50"
-          />
+        {/* Personal invite link */}
+        <div className="bg-gray-50 border border-gray-200 rounded-[16px] p-4 mb-4">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Your invite link</p>
+          <p className="text-sm font-mono text-gray-700 break-all">
+            justcallme.app/invite/{user?.username}
+          </p>
         </div>
 
-        <div className="max-h-[50vh] overflow-y-auto">
-          {searchQuery.length < 2 ? (
-            <div className="text-center py-8">
-              <Search className="w-7 h-7 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Type at least 2 characters to search</p>
-            </div>
-          ) : searching ? (
-            <div className="text-center py-8">
-              <div className="w-6 h-6 border-2 border-callme border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <p className="text-sm text-gray-400">Searching...</p>
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-gray-400">No users found</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {searchResults.map((p) => (
-                <div key={p.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-[14px]">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={p.display_name} id={p.id} size="sm" />
-                    <div>
-                      <p className="font-medium text-sm">{p.display_name}</p>
-                      <p className="text-xs text-gray-400">@{p.username}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => sendFriendRequest(p.id)}
-                    disabled={sendingRequest === p.id}
-                    className="callme-gradient text-white px-3.5 py-1.5 rounded-[10px] text-xs font-semibold flex items-center gap-1 disabled:opacity-60"
-                  >
-                    {sendingRequest === p.id ? (
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <UserPlus className="w-3 h-3" />
-                    )}
-                    {sendingRequest === p.id ? "Sending…" : "Add"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <button
+          onClick={() => { inviteFriends(); setShowAdd(false); }}
+          className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all mb-3"
+        >
+          <Share2 className="w-4 h-4" /> Share My Link
+        </button>
 
-        <div className="mt-5 pt-5 border-t border-gray-100">
-          <button
-            onClick={inviteFriends}
-            className="w-full flex items-center gap-3 p-4 bg-gradient-to-r from-callme-50 to-orange-50 rounded-[16px] border border-callme/10 hover:border-callme/25 transition-all group"
-          >
-            <div className="w-10 h-10 rounded-full callme-gradient flex items-center justify-center flex-shrink-0 group-hover:shadow-md group-hover:shadow-callme/25 transition-all">
-              <MessageCircle className="w-5 h-5 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="font-semibold text-sm">Invite Friends</p>
-              <p className="text-xs text-gray-500">Text a link to people in your contacts</p>
-            </div>
-            <Share2 className="w-4 h-4 text-gray-400 ml-auto" />
-          </button>
-        </div>
+        <button
+          onClick={async () => {
+            const url = `https://justcallme.app/invite/${user?.username}`;
+            try {
+              await navigator.clipboard.writeText(url);
+              toast("Link copied!");
+              setShowAdd(false);
+            } catch {
+              toast("Couldn't copy — try sharing instead");
+            }
+          }}
+          className="w-full bg-white border border-gray-200 text-gray-600 py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-all"
+        >
+          <LinkIcon className="w-4 h-4" /> Copy Link
+        </button>
       </BottomSheet>
     </div>
   );

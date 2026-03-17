@@ -30,6 +30,8 @@ interface AppContextType {
   toast: (msg: string) => void;
   pendingRequests: number;
   refreshKey: number;
+  pendingInviteFrom: string | null;
+  clearPendingInvite: () => void;
 }
 
 const AppContext = createContext<AppContextType>({
@@ -38,6 +40,8 @@ const AppContext = createContext<AppContextType>({
   toast: () => {},
   pendingRequests: 0,
   refreshKey: 0,
+  pendingInviteFrom: null,
+  clearPendingInvite: () => {},
 });
 
 export const useApp = () => useContext(AppContext);
@@ -117,6 +121,7 @@ export default function DashboardLayout({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingInviteFrom, setPendingInviteFrom] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
   const launchJinglePlayed = useRef(false);
   const initialLoadDone = useRef(false);
@@ -293,6 +298,13 @@ export default function DashboardLayout({
     const appUrlListenerPromise = CapApp.addListener("appUrlOpen", async (data: { url: string }) => {
       try {
         const url = new URL(data.url);
+        // callme://invite?from=username — opened from a personal invite link
+        if (url.host === "invite" || url.pathname === "/invite") {
+          const from = url.searchParams.get("from");
+          if (from) setPendingInviteFrom(from);
+          return;
+        }
+        // callme://open?access_token=...&refresh_token=... — email verification callback
         const accessToken = url.searchParams.get("access_token");
         const refreshToken = url.searchParams.get("refresh_token") || "";
         if (accessToken) {
@@ -396,7 +408,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <AppContext.Provider value={{ user, refreshUser: fetchProfile, toast, pendingRequests, refreshKey }}>
+    <AppContext.Provider value={{ user, refreshUser: fetchProfile, toast, pendingRequests, refreshKey, pendingInviteFrom, clearPendingInvite: () => setPendingInviteFrom(null) }}>
       <div className="max-w-md mx-auto min-h-screen flex flex-col">
         <div className="flex-1">{children}</div>
       </div>
