@@ -299,7 +299,8 @@ export default function DashboardLayout({
       try {
         const url = new URL(data.url);
         // callme://invite?from=username — opened from a personal invite link
-        if (url.host === "invite" || url.pathname === "/invite") {
+        // url.host === "invite" because callme://invite parses "invite" as the host
+        if (url.host === "invite") {
           const from = url.searchParams.get("from");
           if (from) setPendingInviteFrom(from);
           return;

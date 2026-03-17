@@ -228,14 +228,17 @@ export default function FriendsPage() {
         .single());
       if (lookupErr || !profile) {
         toast("Couldn't find that user — they may have deleted their account");
+        clearPendingInvite();
         return;
       }
       if (!profile.allow_friend_requests) {
         toast(`${profile.display_name} isn't accepting friend requests right now`);
+        clearPendingInvite();
         return;
       }
       if (profile.id === user.id) {
         toast("That's your own invite link!");
+        clearPendingInvite();
         return;
       }
       const { error } = await withTimeout(supabase.from("friendships").insert({
@@ -244,18 +247,20 @@ export default function FriendsPage() {
         status: "pending",
       }));
       if (error) {
-        // Likely already sent — don't show an error, it's not harmful
+        // Likely a duplicate — treat gracefully, still clear the banner
         toast(`Request already sent to ${profile.display_name}`);
+        clearPendingInvite();
       } else {
         feedbackFriendAdded();
         toast(`Friend request sent to ${profile.display_name}! 🎉`);
+        clearPendingInvite();
         loadData();
       }
     } catch {
+      // Network timeout or unexpected error — keep banner so user can retry
       toast("Something went wrong — try again");
     } finally {
       setSendingInviteRequest(false);
-      clearPendingInvite();
     }
   };
 
@@ -291,7 +296,11 @@ export default function FriendsPage() {
   const inviteFriends = async () => {
     // Personal invite link — includes the sender's username so the recipient
     // lands on a page that knows who invited them and can send a request back.
-    const username = user?.username || "";
+    const username = user?.username;
+    if (!username) {
+      toast("Set a username in your profile first");
+      return;
+    }
     const inviteUrl = `https://justcallme.app/invite/${username}`;
     const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Join me — tap the link and I'll get a friend request from you!\n\n${inviteUrl}`;
     try {
@@ -304,13 +313,7 @@ export default function FriendsPage() {
     }
   };
 
-  // Keep a ref to the latest friends/pendingRequests so the search debounce
-  // can read current exclusion IDs without those values being in its deps
-  // (which would cancel and restart the 300ms timer on every loadData call).
-  const friendsRef = useRef(friends);
-  const pendingRequestsRef = useRef(pendingRequests);
-  useEffect(() => { friendsRef.current = friends; }, [friends]);
-  useEffect(() => { pendingRequestsRef.current = pendingRequests; }, [pendingRequests]);
+
 
   const [friendFilter, setFriendFilter] = useState("");
 
