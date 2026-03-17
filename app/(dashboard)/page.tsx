@@ -255,13 +255,15 @@ export default function HomePage() {
           clearInterval(countdownRef.current!);
           setLocalAvailable(false);
           setLocalAvailableUntil(null);
-          const { error } = await supabase
-            .from("profiles")
-            .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
-            .eq("id", user!.id);
-          if (error) {
-            // DB write failed — roll back local override so the UI doesn't
-            // show unavailable while the server still thinks the user is available.
+          try {
+            const { error } = await withTimeout(supabase
+              .from("profiles")
+              .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
+              .eq("id", user!.id));
+            if (error) throw error;
+          } catch {
+            // DB write failed or timed out — roll back local override so the UI
+            // doesn't show unavailable while the server still thinks the user is available.
             setLocalAvailable(null);
             setLocalAvailableUntil(undefined);
             toast("Couldn't turn off availability — check your connection");
@@ -291,12 +293,14 @@ export default function HomePage() {
     setLocalAvailable(true);
     setLocalAvailableUntil(available_until);
     setShowDurationPicker(false);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_available: true, available_until, last_seen: new Date().toISOString() })
-      .eq("id", user.id);
-    if (error) {
-      // Roll back optimistic update
+    try {
+      const { error } = await withTimeout(supabase
+        .from("profiles")
+        .update({ is_available: true, available_until, last_seen: new Date().toISOString() })
+        .eq("id", user.id));
+      if (error) throw error;
+    } catch {
+      // Roll back optimistic update — covers both DB errors and network timeouts
       setLocalAvailable(null);
       setLocalAvailableUntil(undefined);
       feedbackError();
@@ -315,12 +319,14 @@ export default function HomePage() {
     // Optimistic update — flip UI immediately
     setLocalAvailable(false);
     setLocalAvailableUntil(null);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
-      .eq("id", user.id);
-    if (error) {
-      // Roll back optimistic update
+    try {
+      const { error } = await withTimeout(supabase
+        .from("profiles")
+        .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
+        .eq("id", user.id));
+      if (error) throw error;
+    } catch {
+      // Roll back optimistic update — covers both DB errors and network timeouts
       setLocalAvailable(null);
       setLocalAvailableUntil(undefined);
       feedbackError();
