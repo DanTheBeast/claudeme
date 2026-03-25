@@ -36,36 +36,38 @@ export function BottomSheet({
     return () => document.removeEventListener("focusin", handleFocus);
   }, [open]);
 
-  // Swipe-to-dismiss: track touch on the sheet itself
-  const onTouchStart = (e: React.TouchEvent) => {
-    dragStartY.current = e.touches[0].clientY;
-    dragCurrentY.current = 0;
-    if (sheetRef.current) sheetRef.current.style.transition = "none";
-  };
+   // Swipe-to-dismiss: track touch on the sheet itself
+   const onTouchStart = (e: React.TouchEvent) => {
+     dragStartY.current = e.touches[0].clientY;
+     dragCurrentY.current = 0;
+     // Remove transition during drag for smooth response
+     if (sheetRef.current) sheetRef.current.classList.add("no-transition");
+   };
 
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (dragStartY.current === null) return;
-    const dy = e.touches[0].clientY - dragStartY.current;
-    if (dy < 0) return; // don't allow dragging up
-    dragCurrentY.current = dy;
-    if (sheetRef.current) {
-      sheetRef.current.style.transform = `translateY(${dy}px)`;
-    }
-  };
+   const onTouchMove = (e: React.TouchEvent) => {
+     if (dragStartY.current === null) return;
+     const dy = e.touches[0].clientY - dragStartY.current;
+     if (dy < 0) return; // don't allow dragging up
+     dragCurrentY.current = dy;
+     if (sheetRef.current) {
+       sheetRef.current.style.transform = `translateY(${dy}px)`;
+     }
+   };
 
-  const onTouchEnd = () => {
-    if (sheetRef.current) {
-      sheetRef.current.style.transition = "";
-      sheetRef.current.style.transform = "";
-    }
-    // Dismiss if dragged more than 120px down
-    if (dragCurrentY.current > 120) {
-      feedbackClick();
-      onClose();
-    }
-    dragStartY.current = null;
-    dragCurrentY.current = 0;
-  };
+   const onTouchEnd = () => {
+     if (sheetRef.current) {
+       // Re-enable transition for smooth snap animation
+       sheetRef.current.classList.remove("no-transition");
+       sheetRef.current.style.transform = "";
+     }
+     // Dismiss if dragged more than 120px down
+     if (dragCurrentY.current > 120) {
+       feedbackClick();
+       onClose();
+     }
+     dragStartY.current = null;
+     dragCurrentY.current = 0;
+   };
 
   if (!open) return null;
 

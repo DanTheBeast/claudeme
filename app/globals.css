@@ -83,3 +83,6 @@
 
 .status-pulse { animation: pulse-status 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 .glow-green { animation: glow-green 3s ease-in-out infinite; }
+
+/* Bottom sheet drag-to-dismiss: disable transition during drag for smooth response */
+.no-transition { transition: none !important; }

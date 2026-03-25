@@ -166,15 +166,27 @@ export default function DashboardLayout({
       // Tag Sentry with the logged-in user so errors show who was affected
       setSentryUser(session.user.id, data?.username);
 
-      // Silently sync the user's timezone — update only if it has changed
-      const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (detectedTz && data?.timezone !== detectedTz) {
-        supabase
-          .from("profiles")
-          .update({ timezone: detectedTz })
-          .eq("id", session.user.id)
-          .then(() => {});
-      }
+       // Silently sync the user's timezone — update only if it has changed
+       const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+       if (detectedTz && data?.timezone !== detectedTz) {
+         // Fire-and-forget timezone sync with error logging
+         (async () => {
+           try {
+             const { error } = await supabase
+               .from("profiles")
+               .update({ timezone: detectedTz })
+               .eq("id", session.user.id);
+             if (error) {
+               console.error("[CallMe] timezone sync failed:", error.message);
+             } else {
+               console.log("[CallMe] timezone synced:", detectedTz);
+             }
+           } catch (err: unknown) {
+             const errMsg = err instanceof Error ? err.message : String(err);
+             console.error("[CallMe] timezone sync error:", errMsg);
+           }
+         })();
+       }
 
       // Fetch pending friend requests count for nav badge
       const { count } = await supabase
@@ -374,33 +386,54 @@ export default function DashboardLayout({
     });
 
     // Scope the Realtime subscription to the current user's row only —
-    // without a filter every profile UPDATE on the table fans out to all clients.
-    const getProfileChannel = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const uid = session?.user?.id;
-      if (!uid) return null;
-      return supabase
-        .channel("profile-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "profiles",
-            filter: `id=eq.${uid}`,
-          },
-          (payload) => {
-            setUser((current) => {
-              if (current && payload.new.id === current.id) {
-                return payload.new as Profile;
-              }
-              return current;
-            });
-          }
-        )
-        .subscribe();
-    };
-    const channelPromise = getProfileChannel();
+     // without a filter every profile UPDATE on the table fans out to all clients.
+     const getProfileChannel = async () => {
+       const { data: { session } } = await supabase.auth.getSession();
+       const uid = session?.user?.id;
+       if (!uid) return null;
+
+       // Wrap the channel subscription in a timeout guard to prevent hanging promises
+       // from blocking the cleanup function on unmount.
+       const timeoutPromise = new Promise<null>((resolve) =>
+         setTimeout(() => {
+           console.warn("[CallMe] realtime channel subscription timed out");
+           resolve(null);
+         }, 10000)
+       );
+
+       try {
+         const channelPromise = supabase
+           .channel("profile-changes")
+           .on(
+             "postgres_changes",
+             {
+               event: "UPDATE",
+               schema: "public",
+               table: "profiles",
+               filter: `id=eq.${uid}`,
+             },
+             (payload) => {
+               setUser((current) => {
+                 if (current && payload.new.id === current.id) {
+                   return payload.new as Profile;
+                 }
+                 return current;
+               });
+             }
+           )
+           .subscribe();
+
+         // Wait for either subscription to succeed or timeout
+         return await Promise.race([
+           channelPromise,
+           timeoutPromise,
+         ]);
+       } catch {
+         // Network error or subscription failure — return null and let Realtime retry on next focus
+         return null;
+       }
+     };
+     const channelPromise = getProfileChannel();
 
     return () => {
       clearTimeout(timeout);

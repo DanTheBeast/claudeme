@@ -27,40 +27,54 @@ import {
 // Resize an image file to maxPx on the longest side and compress as JPEG.
 // Runs entirely client-side via canvas — no server round-trip needed.
 function resizeImage(file: File, maxPx: number, quality: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    // Guard against HEIC/HEIF decode hangs — iOS WKWebView can stall decoding
-    // large camera photos, so we give it 30s before giving up.
-    const decodeTimeout = setTimeout(() => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Image decode timed out"));
-    }, 30000);
-    img.onload = () => {
-      clearTimeout(decodeTimeout);
-      URL.revokeObjectURL(url);
-      const { naturalWidth: w, naturalHeight: h } = img;
-      const scale = Math.min(1, maxPx / Math.max(w, h));
-      const canvas = document.createElement("canvas");
-      canvas.width  = Math.round(w * scale);
-      canvas.height = Math.round(h * scale);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("Canvas context unavailable")); return; }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(
-        (blob) => blob ? resolve(blob) : reject(new Error("Canvas toBlob failed")),
-        "image/jpeg",
-        quality
-      );
-    };
-    img.onerror = () => {
-      clearTimeout(decodeTimeout);
-      URL.revokeObjectURL(url);
-      reject(new Error("Image load failed"));
-    };
-    img.src = url;
-  });
-}
+   return new Promise((resolve, reject) => {
+     const img = new Image();
+     const url = URL.createObjectURL(file);
+     let done = false; // guard against double cleanup
+
+     // Guard against HEIC/HEIF decode hangs — iOS WKWebView can stall decoding
+     // large camera photos, so we give it 30s before giving up.
+     const decodeTimeout = setTimeout(() => {
+       if (done) return;
+       done = true;
+       URL.revokeObjectURL(url);
+       reject(new Error("Image decode timed out"));
+     }, 30000);
+
+     const cleanup = () => {
+       if (done) return;
+       done = true;
+       clearTimeout(decodeTimeout);
+       URL.revokeObjectURL(url);
+     };
+
+     img.onload = () => {
+       if (done) return;
+       cleanup();
+       const { naturalWidth: w, naturalHeight: h } = img;
+       const scale = Math.min(1, maxPx / Math.max(w, h));
+       const canvas = document.createElement("canvas");
+       canvas.width  = Math.round(w * scale);
+       canvas.height = Math.round(h * scale);
+       const ctx = canvas.getContext("2d");
+       if (!ctx) { reject(new Error("Canvas context unavailable")); return; }
+       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+       canvas.toBlob(
+         (blob) => blob ? resolve(blob) : reject(new Error("Canvas toBlob failed")),
+         "image/jpeg",
+         quality
+       );
+     };
+
+     img.onerror = () => {
+       if (done) return;
+       cleanup();
+       reject(new Error("Image load failed"));
+     };
+
+     img.src = url;
+   });
+ }
 
 export default function ProfilePage() {
   const { user, refreshUser, toast } = useApp();
@@ -108,16 +122,30 @@ export default function ProfilePage() {
   // not just a user ID change (which only fires on login/logout).
   }, [user?.id, user?.display_name, user?.phone_number, user?.current_mood, user?.username]);
 
-  // Auto-save on blur — called when any field loses focus.
-  // If a save is already in-flight, queue the latest value and run it after.
-  const saveField = async (field: string, value: string) => {
-    if (!user) return;
-    if (field === "display_name" && !value.trim()) {
-      feedbackError();
-      toast("Name can't be empty");
-      setDraft((d) => ({ ...d, display_name: user.display_name || "" }));
-      return;
-    }
+   // Auto-save on blur — called when any field loses focus.
+   // If a save is already in-flight, queue the latest value and run it after.
+   const saveField = async (field: string, value: string) => {
+     if (!user) return;
+     if (field === "display_name" && !value.trim()) {
+       feedbackError();
+       toast("Name can't be empty");
+       setDraft((d) => ({ ...d, display_name: user.display_name || "" }));
+       return;
+     }
+     // Validate phone number format: allow empty, or 10+ digits (US) or +country format
+     if (field === "phone_number" && value && value.trim()) {
+       const digits = value.replace(/\D/g, "");
+       // Must be either empty, US format (10 digits), or international (+X format)
+       const isValid = !value.trim() || 
+         (value.startsWith("+") && digits.length >= 7) || // +country codes are 7-15 digits
+         (digits.length === 10); // US format
+       if (!isValid) {
+         feedbackError();
+         toast("Enter a valid phone number");
+         setDraft((d) => ({ ...d, phone_number: user.phone_number || "" }));
+         return;
+       }
+     }
     if (savingRef.current) {
       // Don't drop it — queue it so it runs after the current save finishes
       pendingSave.current = { field, value };
@@ -224,11 +252,12 @@ export default function ProfilePage() {
     await refreshUser();
   };
 
-  const [confirmLogout, setConfirmLogout] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+   const [confirmLogout, setConfirmLogout] = useState(false);
+   const [confirmDelete, setConfirmDelete] = useState(false);
+   const [deleting, setDeleting] = useState(false);
+   const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleDeleteAccount = async () => {
+   const handleDeleteAccount = async () => {
     if (!user) return;
     setDeleting(true);
     try {
@@ -267,22 +296,29 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLogout = async () => {
-    // Clear all Supabase session keys from localStorage first so the session
-    // is gone regardless of whether signOut succeeds (network may be offline).
-    try {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith("sb-"))
-        .forEach((k) => localStorage.removeItem(k));
-    } catch {}
-    // signOut triggers onAuthStateChange(SIGNED_OUT) in layout.tsx which sets
-    // authed=false and renders <AuthPage /> — no page reload needed.
-    // If signOut fails (e.g. expired token), the localStorage wipe above means
-    // the next fetchProfile call will still see no session and sign the user out.
-    try {
-      await supabase.auth.signOut({ scope: "local" });
-    } catch {}
-  };
+   const handleLogout = async () => {
+     setLoggingOut(true);
+     try {
+       // Clear all Supabase session keys from localStorage first so the session
+       // is gone regardless of whether signOut succeeds (network may be offline).
+       try {
+         Object.keys(localStorage)
+           .filter((k) => k.startsWith("sb-"))
+           .forEach((k) => localStorage.removeItem(k));
+       } catch {}
+       // signOut triggers onAuthStateChange(SIGNED_OUT) in layout.tsx which sets
+       // authed=false and renders <AuthPage /> — no page reload needed.
+       // If signOut fails (e.g. expired token), the localStorage wipe above means
+       // the next fetchProfile call will still see no session and sign the user out.
+       try {
+         await supabase.auth.signOut({ scope: "local" });
+       } catch {}
+     } finally {
+       // Even if signOut fails, layout's auth listener will handle the transition.
+       // Reset loggingOut state in case we somehow return (shouldn't happen).
+       setLoggingOut(false);
+     }
+   };
 
   if (!user) return null;
 
@@ -547,21 +583,23 @@ export default function ProfilePage() {
         </a>
 
         {/* Sign Out — two-step to prevent accidental taps */}
-        {confirmLogout ? (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setConfirmLogout(false)}
-              className="flex-1 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex-1 px-5 py-3.5 bg-red-500 border-[1.5px] border-red-500 rounded-[16px] text-white font-semibold text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-            >
-              <LogOut className="w-[18px] h-[18px]" /> Yes, sign out
-            </button>
-          </div>
+         {confirmLogout ? (
+           <div className="flex gap-2">
+             <button
+               onClick={() => setConfirmLogout(false)}
+               disabled={loggingOut}
+               className="flex-1 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+               Cancel
+             </button>
+             <button
+               onClick={handleLogout}
+               disabled={loggingOut}
+               className="flex-1 px-5 py-3.5 bg-red-500 border-[1.5px] border-red-500 rounded-[16px] text-white font-semibold text-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+             >
+               <LogOut className="w-[18px] h-[18px]" /> {loggingOut ? "Signing out..." : "Yes, sign out"}
+             </button>
+           </div>
         ) : (
           <button
             onClick={() => setConfirmLogout(true)}

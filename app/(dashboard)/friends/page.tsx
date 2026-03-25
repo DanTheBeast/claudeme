@@ -26,22 +26,27 @@ import { Share } from "@capacitor/share";
 import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
 export default function FriendsPage() {
-  const { user, toast, refreshUser, refreshKey, pendingInviteFrom, clearPendingInvite } = useApp();
-  // Stable client — avoids a new instance on every render
-  const supabase = useMemo(() => createClient(), []);
+   const { user, toast, refreshUser, refreshKey, pendingInviteFrom, clearPendingInvite } = useApp();
+   // Stable client — avoids a new instance on every render
+   const supabase = useMemo(() => createClient(), []);
 
-  const [friends, setFriends] = useState<FriendWithProfile[]>([]);
-  const [pendingRequests, setPendingRequests] = useState<
-    (Friendship & { requester?: Profile })[]
-  >([]);
-  const [outgoingRequests, setOutgoingRequests] = useState<
-    (Friendship & { recipient?: Profile })[]
-  >([]);
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [sendingInviteRequest, setSendingInviteRequest] = useState(false);
+   const [friends, setFriends] = useState<FriendWithProfile[]>([]);
+   const [pendingRequests, setPendingRequests] = useState<
+     (Friendship & { requester?: Profile })[]
+   >([]);
+   const [outgoingRequests, setOutgoingRequests] = useState<
+     (Friendship & { recipient?: Profile })[]
+   >([]);
+   const [loading, setLoading] = useState(true);
+   const [showAdd, setShowAdd] = useState(false);
+   const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
+   const [confirmRemove, setConfirmRemove] = useState(false);
+   const [sendingInviteRequest, setSendingInviteRequest] = useState(false);
+   // Track which request action is currently in progress to prevent double-clicks
+   const [pendingActionId, setPendingActionId] = useState<number | null>(null);
+   // Guard against state updates on unmounted component — prevents memory leaks
+   // and React warnings when rapidly switching between pages
+   const isMounted = useRef(true);
 
 
 
@@ -149,26 +154,31 @@ export default function FriendsPage() {
       }
     }
 
-    // Only update state slices that actually loaded successfully — never
-    // overwrite good data with null on a partial failure.
-    if (newFriends !== null) setFriends(newFriends);
-    if (newPending !== null) setPendingRequests(newPending);
-    if (newOutgoing !== null) setOutgoingRequests(newOutgoing);
+     // Guard against state updates on unmounted component
+     if (!isMounted.current) return;
 
-    // Write cache with whatever we have — use functional reads to get current state
-    // rather than stale closure values.
-    if (newFriends !== null && newPending !== null && newOutgoing !== null) {
-      cacheWrite("friends_page", user.id, { friends: newFriends, pending: newPending, outgoing: newOutgoing });
-    }
-    } catch {
-      // Network timeout or unexpected error — don't wipe existing data
-    } finally {
-      setLoading(false);
-    }
-  };
+     // Only update state slices that actually loaded successfully — never
+     // overwrite good data with null on a partial failure.
+     if (newFriends !== null) setFriends(newFriends);
+     if (newPending !== null) setPendingRequests(newPending);
+     if (newOutgoing !== null) setOutgoingRequests(newOutgoing);
 
-  useEffect(() => {
-    if (!user) return;
+     // Write cache with whatever we have — use functional reads to get current state
+     // rather than stale closure values.
+     if (newFriends !== null && newPending !== null && newOutgoing !== null) {
+       cacheWrite("friends_page", user.id, { friends: newFriends, pending: newPending, outgoing: newOutgoing });
+     }
+     } catch {
+       // Network timeout or unexpected error — don't wipe existing data
+     } finally {
+       if (isMounted.current) setLoading(false);
+     }
+   };
+
+   useEffect(() => {
+     if (!user) return;
+     // Mark component as mounted for the entire lifecycle
+     isMounted.current = true;
     // Seed from cache immediately so there's no skeleton on resume
     type FriendsCache = {
       friends: FriendWithProfile[];
@@ -183,37 +193,81 @@ export default function FriendsPage() {
       setLoading(false);
     }
     loadData();
-  }, [user?.id, refreshKey]);
+
+    // Cleanup: mark component as unmounted so pending promises don't update state
+    return () => {
+      isMounted.current = false;
+    };
+   }, [user?.id, refreshKey]);
 
   // Debounced search — only shows users who allow friend requests,
   // and filters out people already friended or with a pending request.
 
 
-  const acceptRequest = async (requestId: number) => {
-    feedbackSuccess();
-    const { error } = await supabase.from("friendships").update({ status: "accepted" }).eq("id", requestId);
-    if (error) { feedbackError(); toast("Failed to accept request"); return; }
-    toast("Friend request accepted! 🤝");
-    loadData();
-    refreshUser(); // refreshes pending badge count
-  };
+   const acceptRequest = async (requestId: number) => {
+     if (pendingActionId) return; // prevent double-click
+     setPendingActionId(requestId);
+     feedbackSuccess();
+     // Optimistic update: remove from pending immediately, reload on success
+     const originalPending = pendingRequests;
+     setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
 
-  const cancelRequest = async (requestId: number) => {
-    feedbackClick();
-    const { error } = await supabase.from("friendships").delete().eq("id", requestId);
-    if (error) { feedbackError(); toast("Failed to cancel request"); return; }
-    toast("Request cancelled");
-    loadData();
-  };
+     const { error } = await supabase.from("friendships").update({ status: "accepted" }).eq("id", requestId);
+     setPendingActionId(null);
+     if (error) {
+       // Revert optimistic update on failure
+       setPendingRequests(originalPending);
+       feedbackError();
+       toast("Failed to accept request");
+       return;
+     }
+     toast("Friend request accepted! 🤝");
+     loadData(); // reload full data to update friends list and counts
+     refreshUser(); // refreshes pending badge count
+   };
 
-  const declineRequest = async (requestId: number) => {
-    feedbackClick();
-    const { error } = await supabase.from("friendships").delete().eq("id", requestId);
-    if (error) { feedbackError(); toast("Failed to decline request"); return; }
-    toast("Request declined");
-    loadData();
-    refreshUser(); // refreshes pending badge count
-  };
+    const cancelRequest = async (requestId: number) => {
+      if (pendingActionId) return; // prevent double-click
+      setPendingActionId(requestId);
+      feedbackClick();
+      // Optimistic update: remove from outgoing immediately
+      const originalOutgoing = outgoingRequests;
+      setOutgoingRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+      const { error } = await supabase.from("friendships").delete().eq("id", requestId);
+      setPendingActionId(null);
+      if (error) {
+        // Revert optimistic update on failure
+        setOutgoingRequests(originalOutgoing);
+        feedbackError();
+        toast("Failed to cancel request");
+        return;
+      }
+      toast("Request cancelled");
+      loadData();
+    };
+
+    const declineRequest = async (requestId: number) => {
+      if (pendingActionId) return; // prevent double-click
+      setPendingActionId(requestId);
+      feedbackClick();
+      // Optimistic update: remove from pending immediately
+      const originalPending = pendingRequests;
+      setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+      const { error } = await supabase.from("friendships").delete().eq("id", requestId);
+      setPendingActionId(null);
+      if (error) {
+        // Revert optimistic update on failure
+        setPendingRequests(originalPending);
+        feedbackError();
+        toast("Failed to decline request");
+        return;
+      }
+      toast("Request declined");
+      loadData();
+      refreshUser(); // refreshes pending badge count
+    };
 
   // Called when the app is opened via a callme://invite?code=... deep link,
   // or when a user enters a code manually. Routes through the redeem-invite-code
@@ -317,18 +371,23 @@ export default function FriendsPage() {
 
 
 
-  const [friendFilter, setFriendFilter] = useState("");
+   const [friendFilter, setFriendFilter] = useState("");
 
-  const filteredFriends = friendFilter.trim()
-    ? friends.filter((f) =>
-        f.friend.display_name?.toLowerCase().includes(friendFilter.toLowerCase()) ||
-        f.friend.username?.toLowerCase().includes(friendFilter.toLowerCase())
-      )
-    : friends;
+   // Memoize filtered friends to avoid re-filtering on every render
+   // Only recompute when friendFilter or friends list actually changes
+   const filteredFriends = useMemo(() => {
+     if (!friendFilter.trim()) return friends;
+     const lowerFilter = friendFilter.toLowerCase();
+     return friends.filter((f) =>
+       f.friend.display_name?.toLowerCase().includes(lowerFilter) ||
+       f.friend.username?.toLowerCase().includes(lowerFilter)
+     );
+   }, [friendFilter, friends]);
 
-  const available = filteredFriends.filter((f) => !f.is_muted && f.friend.is_available);
-  const offline = filteredFriends.filter((f) => !f.is_muted && !f.friend.is_available);
-  const muted = filteredFriends.filter((f) => f.is_muted);
+   // Memoize categorized friends lists
+   const available = useMemo(() => filteredFriends.filter((f) => !f.is_muted && f.friend.is_available), [filteredFriends]);
+   const offline = useMemo(() => filteredFriends.filter((f) => !f.is_muted && !f.friend.is_available), [filteredFriends]);
+   const muted = useMemo(() => filteredFriends.filter((f) => f.is_muted), [filteredFriends]);
 
   return (
     <div className="pb-24">

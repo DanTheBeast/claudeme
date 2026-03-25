@@ -36,14 +36,19 @@ export function cacheRead<T>(key: string, userId: string): T | null {
 }
 
 export function cacheWrite<T>(key: string, userId: string, data: T): void {
-  if (typeof window === "undefined") return;
-  try {
-    const entry: CacheEntry<T> = { data, userId, ts: Date.now() };
-    localStorage.setItem(PREFIX + key, JSON.stringify(entry));
-  } catch {
-    // localStorage full or unavailable — silently ignore
-  }
-}
+   if (typeof window === "undefined") return;
+   // Defensive check: never cache data for an empty or invalid user ID
+   if (!userId || typeof userId !== "string" || userId.length === 0) {
+     console.warn("[CallMe] cache write rejected: invalid userId");
+     return;
+   }
+   try {
+     const entry: CacheEntry<T> = { data, userId, ts: Date.now() };
+     localStorage.setItem(PREFIX + key, JSON.stringify(entry));
+   } catch {
+     // localStorage full or unavailable — silently ignore
+   }
+ }
 
 /**
  * Wraps a promise (or PromiseLike, e.g. Supabase query builders) with a

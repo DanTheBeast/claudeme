@@ -37,51 +37,56 @@ function timeToMinutes(t: string): number {
  * Convert a "HH:MM" time string from a source timezone into the viewer's
  * local timezone, returning a new "HH:MM" string.
  *
- * Strategy: construct a Date that represents "this HH:MM on a fixed reference
- * day in sourceTz", then read back the hours and minutes in local time.
- * Uses Temporal-style Intl tricks to find the UTC instant that corresponds to
- * the given wall-clock time in sourceTz, which correctly handles all offsets
- * including half-hour (India +5:30) and 45-minute (Nepal +5:45) zones.
+ * Strategy: construct a Date that represents "this HH:MM on today's date in sourceTz",
+ * then read back the hours and minutes in local time. Uses Temporal-style Intl tricks
+ * to find the UTC instant that corresponds to the given wall-clock time in sourceTz,
+ * which correctly handles all offsets including DST, half-hour (India +5:30) and
+ * 45-minute (Nepal +5:45) zones.
  */
 function convertTimeToLocal(time: string, sourceTz: string): string {
-  if (!sourceTz || sourceTz === "UTC") {
-    return time;
-  }
-  try {
-    const [h, m] = time.split(":").map(Number);
-    if (isNaN(h) || isNaN(m)) return time;
+   if (!sourceTz || sourceTz === "UTC") {
+     return time;
+   }
+   try {
+     const [h, m] = time.split(":").map(Number);
+     if (isNaN(h) || isNaN(m)) return time;
 
-    // Use a fixed reference date unlikely to straddle a DST boundary mid-day
-    const refDate = "2024-01-15"; // A Monday in northern-hemisphere winter
+     // Use today's date as the reference to get correct DST rules for the current period
+     const today = new Date();
+     const year = today.getUTCFullYear();
+     const month = String(today.getUTCMonth() + 1).padStart(2, "0");
+     const date = String(today.getUTCDate()).padStart(2, "0");
+     const refDate = `${year}-${month}-${date}`;
 
-    // Step 1: find the UTC offset of sourceTz on the reference date by
-    // formatting a known UTC noon and reading back the local hour/minute.
-    const noonUTC = new Date(`${refDate}T12:00:00Z`);
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: sourceTz,
-      hour: "2-digit", minute: "2-digit",
-      hour12: false,
-    }).formatToParts(noonUTC);
-    const srcHour = parseInt(parts.find(p => p.type === "hour")?.value ?? "12");
-    const srcMin  = parseInt(parts.find(p => p.type === "minute")?.value ?? "0");
-    // offset = (sourceTz wall clock) - UTC, in minutes
-    const offsetMinutes = (srcHour === 24 ? 0 : srcHour) * 60 + srcMin - 12 * 60;
+     // Step 1: find the UTC offset of sourceTz on today by
+     // formatting a known UTC noon and reading back the local hour/minute.
+     const noonUTC = new Date(`${refDate}T12:00:00Z`);
+     const parts = new Intl.DateTimeFormat("en-CA", {
+       timeZone: sourceTz,
+       hour: "2-digit", minute: "2-digit",
+       hour12: false,
+     }).formatToParts(noonUTC);
+     const srcHour = parseInt(parts.find(p => p.type === "hour")?.value ?? "12");
+     const srcMin  = parseInt(parts.find(p => p.type === "minute")?.value ?? "0");
+     // offset = (sourceTz wall clock) - UTC, in minutes
+     const offsetMinutes = (srcHour === 24 ? 0 : srcHour) * 60 + srcMin - 12 * 60;
 
-    // Step 2: compute the UTC instant for h:mm in sourceTz
-    const utcMins = h * 60 + m - offsetMinutes;
+     // Step 2: compute the UTC instant for h:mm in sourceTz
+     const utcMins = h * 60 + m - offsetMinutes;
 
-    // Step 3: convert that UTC instant to local time
-    const localOffset = -new Date().getTimezoneOffset(); // minutes ahead of UTC
-    const localMins = utcMins + localOffset;
-    // Wrap to [0, 1440)
-    const wrapped = ((localMins % 1440) + 1440) % 1440;
-    const lh = Math.floor(wrapped / 60);
-    const lm = wrapped % 60;
-    return `${String(lh).padStart(2, "0")}:${String(lm).padStart(2, "0")}`;
-  } catch {
-    return time; // fallback: show as-is
-  }
-}
+     // Step 3: convert that UTC instant to local time
+     const localOffset = -new Date().getTimezoneOffset(); // minutes ahead of UTC
+     const localMins = utcMins + localOffset;
+     // Wrap to [0, 1440) — validate bounds
+     const wrapped = ((localMins % 1440) + 1440) % 1440;
+     if (isNaN(wrapped)) return time; // defensive check
+     const lh = Math.floor(wrapped / 60);
+     const lm = Math.round(wrapped % 60); // round to avoid floating point issues
+     return `${String(lh).padStart(2, "0")}:${String(lm).padStart(2, "0")}`;
+   } catch {
+     return time; // fallback: show as-is
+   }
+ }
 
 function timesOverlap(
   aStart: string,
@@ -116,11 +121,13 @@ export default function SchedulePage() {
   // Stable client instance — avoids creating a new client on every render
   const supabase = useMemo(() => createClient(), []);
 
-  const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
-  const [friendWindows, setFriendWindows] = useState<FriendWindow[]>([]);
-  const [friendProfiles, setFriendProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const loadedOnce = useRef(false);
+   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
+   const [friendWindows, setFriendWindows] = useState<FriendWindow[]>([]);
+   const [friendProfiles, setFriendProfiles] = useState<Profile[]>([]);
+   const [loading, setLoading] = useState(true);
+   const loadedOnce = useRef(false);
+   // Guard against state updates on unmounted component — prevents memory leaks
+   const isMounted = useRef(true);
   const [showFriends, setShowFriends] = useState(true);
   const [addModal, setAddModal] = useState<{
     day: number;
@@ -207,34 +214,47 @@ export default function SchedulePage() {
             });
           }
         }
-      }
+       }
 
-      setWindows(newWindows);
-      setFriendProfiles(newFriendProfiles);
-      setFriendWindows(newFriendWindows);
-      cacheWrite("schedule_page", user.id, { windows: newWindows, friendWindows: newFriendWindows, friendProfiles: newFriendProfiles });
-    } catch {
-      // Network timeout or unexpected error — preserve existing data
-    } finally {
-      loadedOnce.current = true;
-      setLoading(false);
-    }
-  };
+       // Guard against state updates on unmounted component
+       if (!isMounted.current) return;
 
-  useEffect(() => {
-    if (!user) return;
-    // Seed from cache immediately so there's no skeleton on resume
-    type ScheduleCache = { windows: AvailabilityWindow[]; friendWindows: FriendWindow[]; friendProfiles: Profile[] };
-    const cached = cacheRead<ScheduleCache>("schedule_page", user.id);
-    if (cached && !loadedOnce.current) {
-      setWindows(cached.windows);
-      setFriendWindows(cached.friendWindows);
-      setFriendProfiles(cached.friendProfiles);
-      setLoading(false);
-      loadedOnce.current = true;
-    }
-    loadWindows();
-  }, [user?.id, refreshKey]);
+       setWindows(newWindows);
+       setFriendProfiles(newFriendProfiles);
+       setFriendWindows(newFriendWindows);
+       cacheWrite("schedule_page", user.id, { windows: newWindows, friendWindows: newFriendWindows, friendProfiles: newFriendProfiles });
+     } catch {
+       // Network timeout or unexpected error — preserve existing data
+     } finally {
+       if (isMounted.current) {
+         loadedOnce.current = true;
+         setLoading(false);
+       }
+     }
+   };
+
+   useEffect(() => {
+     if (!user) return;
+     // Mark component as mounted for the entire lifecycle
+     isMounted.current = true;
+
+     // Seed from cache immediately so there's no skeleton on resume
+     type ScheduleCache = { windows: AvailabilityWindow[]; friendWindows: FriendWindow[]; friendProfiles: Profile[] };
+     const cached = cacheRead<ScheduleCache>("schedule_page", user.id);
+     if (cached && !loadedOnce.current) {
+       setWindows(cached.windows);
+       setFriendWindows(cached.friendWindows);
+       setFriendProfiles(cached.friendProfiles);
+       setLoading(false);
+       loadedOnce.current = true;
+     }
+     loadWindows();
+
+     // Cleanup: mark component as unmounted so pending promises don't update state
+     return () => {
+       isMounted.current = false;
+     };
+   }, [user?.id, refreshKey]);
 
   const addWindow = async (w: {
     day: number;

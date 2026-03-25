@@ -3,21 +3,28 @@
 import { useEffect, useRef } from "react";
 
 export function Toast({
-  message,
-  onDone,
-}: {
-  message: string;
-  onDone: () => void;
-}) {
-  // Store onDone in a ref so the timer never restarts if the parent re-renders
-  // and passes a new function reference (which would reset the 2800ms window).
-  const onDoneRef = useRef(onDone);
-  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
+   message,
+   onDone,
+ }: {
+   message: string;
+   onDone: () => void;
+ }) {
+   // Store onDone in a ref so the timer never restarts if the parent re-renders
+   // and passes a new function reference (which would reset the 2800ms window).
+   const onDoneRef = useRef(onDone);
+   useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
 
-  useEffect(() => {
-    const t = setTimeout(() => onDoneRef.current(), 2800);
-    return () => clearTimeout(t);
-  }, [message]); // re-start timer only when the message itself changes
+   // Use a unique key to ensure timer restarts even if the message is identical.
+   // This handles the case where "Failed to save" appears twice in rapid succession.
+   const messageKey = useRef(0);
+   useEffect(() => {
+     messageKey.current++;
+   }, [message]);
+
+   useEffect(() => {
+     const t = setTimeout(() => onDoneRef.current(), 2800);
+     return () => clearTimeout(t);
+   }, [message, messageKey.current]); // re-start timer when message or count changes
 
   return (
     <div

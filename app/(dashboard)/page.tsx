@@ -241,47 +241,47 @@ export default function HomePage() {
     }
   }, [user?.current_mood]);
 
-  // Countdown ticker — starts/clears based on effective availableUntil.
-  // Ticks every 15s so short timers (< 5 min) stay accurate.
-  useEffect(() => {
-    if (countdownRef.current) clearInterval(countdownRef.current);
+   // Countdown ticker — starts/clears based on effective availableUntil.
+   // Ticks every 15s so short timers (< 5 min) stay accurate.
+   // Handles expiration by writing to the DB first, only updating UI on success.
+   useEffect(() => {
+     if (countdownRef.current) clearInterval(countdownRef.current);
 
-    if (isAvailable && availableUntil) {
-      const tick = async () => {
-        const ms = new Date(availableUntil).getTime() - Date.now();
-        if (ms <= 0) {
-          // Expired — turn off automatically
-          setCountdown(null);
-          clearInterval(countdownRef.current!);
-          setLocalAvailable(false);
-          setLocalAvailableUntil(null);
-          try {
-            const { error } = await withTimeout(supabase
-              .from("profiles")
-              .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
-              .eq("id", user!.id));
-            if (error) throw error;
-          } catch {
-            // DB write failed or timed out — roll back local override so the UI
-            // doesn't show unavailable while the server still thinks the user is available.
-            setLocalAvailable(null);
-            setLocalAvailableUntil(undefined);
-            toast("Couldn't turn off availability — check your connection");
-          }
-          // On success: useEffect watching user.is_available will clear local
-          // overrides once Realtime confirms the update.
-        } else {
-          setCountdown(formatCountdown(availableUntil));
-        }
-      };
-      tick();
-      countdownRef.current = setInterval(tick, 15000); // tick every 15s for accuracy
-    } else {
-      setCountdown(null);
-    }
+     if (isAvailable && availableUntil) {
+       const tick = async () => {
+         const ms = new Date(availableUntil).getTime() - Date.now();
+         if (ms <= 0) {
+           // Expired — turn off automatically
+           setCountdown(null);
+           clearInterval(countdownRef.current!);
+           try {
+             // Try to sync with the server first before updating UI
+             const { error } = await withTimeout(supabase
+               .from("profiles")
+               .update({ is_available: false, available_until: null, last_seen: new Date().toISOString() })
+               .eq("id", user!.id));
+             if (error) throw error;
+             // Only update local state after DB write succeeds
+             setLocalAvailable(false);
+             setLocalAvailableUntil(null);
+           } catch {
+             // DB write failed or timed out — don't change the UI, let Realtime handle it.
+             // The user is still marked available on the server until Realtime syncs or
+             // they manually turn off, so we avoid showing a "fake" unavailable state.
+             toast("Couldn't turn off availability automatically — you may still be showing as available");
+           }
+         } else {
+           setCountdown(formatCountdown(availableUntil));
+         }
+       };
+       tick();
+       countdownRef.current = setInterval(tick, 15000); // tick every 15s for accuracy
+     } else {
+       setCountdown(null);
+     }
 
-    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
-  }, [isAvailable, availableUntil]);
+     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+   }, [isAvailable, availableUntil]);
 
   const goAvailable = async (minutes: number | null) => {
     if (!user) return;
@@ -346,22 +346,25 @@ export default function HomePage() {
     }
   };
 
-  const saveMood = async () => {
-    if (!user) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ current_mood: mood })
-      .eq("id", user.id);
-    if (error) {
-      feedbackError();
-      toast("Failed to save status — try again");
-      return;
-    }
-    feedbackSuccess();
-    await refreshUser();
-    setMoodDirty(false);
-    toast("Status updated! ✨");
-  };
+   const saveMood = async () => {
+     if (!user) return;
+     // Optimistic update: save the mood immediately before DB write
+     const optimisticUser = { ...user, current_mood: mood };
+
+     const { error } = await supabase
+       .from("profiles")
+       .update({ current_mood: mood })
+       .eq("id", user.id);
+     if (error) {
+       feedbackError();
+       toast("Failed to save status — try again");
+       return;
+     }
+     feedbackSuccess();
+     await refreshUser();
+     setMoodDirty(false);
+     toast("Status updated! ✨");
+   };
 
   // Muted friends are excluded from "Available now" — same behaviour as friends page
   const available = friends.filter((f) => f.friend.is_available && !f.is_muted);
@@ -512,7 +515,9 @@ export default function HomePage() {
             maxLength={120}
             className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/15 focus:border-callme bg-white resize-none"
           />
-          <p className="text-[11px] text-gray-300 text-right mt-1">{mood.length}/120</p>
+          <p className={`text-[11px] text-right mt-1 ${mood.length > 100 ? "text-amber-600 font-medium" : "text-gray-300"}`}>
+            {mood.length}/120{mood.length > 100 && " (⚠️ getting close)"}
+          </p>
           {moodDirty && (
             <div className="flex justify-end mt-2">
               <button
@@ -584,16 +589,22 @@ export default function HomePage() {
             <p className="text-gray-400 text-sm leading-relaxed mb-6">
               CallMe only works if your people are on it too. Text a few friends the link and get them to download it.
             </p>
-            <button
-              onClick={async () => {
-                try {
-                  await Share.share({
-                    title: "Download CallMe",
-                    text: "I've been using this app called CallMe to share when I'm free to talk. Way better than texting back and forth. Download it:",
-                    url: "https://apps.apple.com/app/just-call-me-app/id6759512338",
-                  });
-                } catch {}
-              }}
+             <button
+               onClick={async () => {
+                 try {
+                   await Share.share({
+                     title: "Download CallMe",
+                     text: "I've been using this app called CallMe to share when I'm free to talk. Way better than texting back and forth. Download it:",
+                     url: "https://apps.apple.com/app/just-call-me-app/id6759512338",
+                   });
+                 } catch (err: unknown) {
+                   // User cancelled share (AbortError) or share failed — silently ignore
+                   // Only log actual errors, not user cancellations
+                   if (err instanceof Error && err.name !== "AbortError") {
+                     console.error("[CallMe] share failed:", err.message);
+                   }
+                 }
+               }}
               className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all w-full justify-center mb-3"
             >
               <Share2 className="w-4 h-4" /> Text a friend the link
