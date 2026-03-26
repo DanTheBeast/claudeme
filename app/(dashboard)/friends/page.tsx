@@ -9,19 +9,15 @@ import { Avatar } from "@/app/_components/avatar";
 import { FriendCard } from "@/app/_components/friend-card";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
 import {
-  Plus,
-  UserPlus,
-  UserMinus,
-  X,
-  Users,
-  Check,
-  Share2,
-  MessageCircle,
-  BellOff,
-  Bell,
-  Phone,
-  Link as LinkIcon,
-} from "lucide-react";
+   UserPlus,
+   UserMinus,
+   X,
+   Users,
+   Check,
+   BellOff,
+   Bell,
+   Phone,
+ } from "lucide-react";
 import { Share } from "@capacitor/share";
 import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
@@ -38,7 +34,6 @@ export default function FriendsPage() {
      (Friendship & { recipient?: Profile })[]
    >([]);
    const [loading, setLoading] = useState(true);
-   const [showAdd, setShowAdd] = useState(false);
    const [selectedFriend, setSelectedFriend] = useState<FriendWithProfile | null>(null);
    const [confirmRemove, setConfirmRemove] = useState(false);
    const [sendingInviteRequest, setSendingInviteRequest] = useState(false);
@@ -340,37 +335,6 @@ export default function FriendsPage() {
     toast(currentlyMuted ? `${name} unmuted` : `${name} muted — you won't see each other's availability`);
   };
 
-  const [generatingCode, setGeneratingCode] = useState(false);
-
-  const inviteFriends = async () => {
-    if (!user) return;
-    setGeneratingCode(true);
-    try {
-      // Fetch a unique invite code from the server — stable per user until redeemed
-      const { data: { session } } = await createClient().auth.getSession();
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
-        { method: "POST", headers: { "Authorization": `Bearer ${session?.access_token}` } }
-      );
-      const json = await res.json();
-      if (!res.ok || !json.code) {
-        toast(json.error || "Couldn't generate invite link — try again");
-        return;
-      }
-      const inviteUrl = `https://justcallme.app/i/${json.code}`;
-      const inviteText = `Hey! I'm using CallMe to stay in touch with the people who matter. Join me — tap the link and I'll get a friend request from you!\n\n${inviteUrl}`;
-      await Share.share({ title: "Join me on CallMe", text: inviteText, url: inviteUrl });
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        toast("Couldn't open share sheet");
-      }
-    } finally {
-      setGeneratingCode(false);
-    }
-  };
-
-
-
    const [friendFilter, setFriendFilter] = useState("");
 
    // Memoize filtered friends to avoid re-filtering on every render
@@ -395,20 +359,7 @@ export default function FriendsPage() {
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Friends</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={inviteFriends}
-              className="text-callme border border-callme/20 px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:bg-callme-50 transition-all"
-            >
-              <Share2 className="w-4 h-4" /> Invite
-            </button>
-            <button
-              onClick={() => setShowAdd(true)}
-              className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
-            >
-              <Plus className="w-4 h-4" /> Add
-            </button>
-          </div>
+
         </div>
       </header>
 
@@ -611,18 +562,7 @@ export default function FriendsPage() {
               Add the friends and family you actually want to talk to — not the whole internet.
             </p>
             <div className="flex flex-col gap-2.5 items-center">
-              <button
-                onClick={() => setShowAdd(true)}
-                className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
-              >
-                <UserPlus className="w-4 h-4" /> Add Friends
-              </button>
-              <button
-                onClick={inviteFriends}
-                className="text-callme px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 border border-callme/20 hover:bg-callme-50 transition-all"
-              >
-                <MessageCircle className="w-4 h-4" /> Invite Friends
-              </button>
+
             </div>
           </div>
         )}
@@ -719,52 +659,7 @@ export default function FriendsPage() {
         )}
       </BottomSheet>
 
-      {/* Add Friend Sheet */}
-      <BottomSheet open={showAdd} onClose={() => setShowAdd(false)}>
-        <h3 className="font-display text-xl font-bold mb-2 flex items-center gap-2">
-          <UserPlus className="w-5 h-5" /> Add Friends
-        </h3>
-        <p className="text-sm text-gray-400 mb-6 leading-relaxed">
-          CallMe is invite-only. Share your personal link — when someone taps it and signs up, you'll get a friend request from them.
-        </p>
 
-        <button
-          onClick={() => { inviteFriends(); setShowAdd(false); }}
-          disabled={generatingCode}
-          className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all mb-3 disabled:opacity-60"
-        >
-          {generatingCode
-            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generating link…</>
-            : <><Share2 className="w-4 h-4" /> Share My Invite Link</>
-          }
-        </button>
-
-        <button
-          disabled={generatingCode}
-          onClick={async () => {
-            setGeneratingCode(true);
-            try {
-              const { data: { session } } = await createClient().auth.getSession();
-              const res = await fetch(
-                `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
-                { method: "POST", headers: { "Authorization": `Bearer ${session?.access_token}` } }
-              );
-              const json = await res.json();
-              if (!res.ok || !json.code) { toast(json.error || "Couldn't generate link"); return; }
-              await navigator.clipboard.writeText(`https://justcallme.app/i/${json.code}`);
-              toast("Link copied!");
-              setShowAdd(false);
-            } catch {
-              toast("Couldn't copy — try sharing instead");
-            } finally {
-              setGeneratingCode(false);
-            }
-          }}
-          className="w-full bg-white border border-gray-200 text-gray-600 py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-all disabled:opacity-60"
-        >
-          <LinkIcon className="w-4 h-4" /> Copy Link
-        </button>
-      </BottomSheet>
     </div>
   );
 }
