@@ -8,18 +8,17 @@ import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick, fe
 import { FriendCard } from "@/app/_components/friend-card";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
 import {
-  Phone,
-  PhoneOff,
-  Plus,
-  Lightbulb,
-  Save,
-  Clock,
-  ChevronDown,
-  Timer,
-  Infinity,
-  ArrowRight,
-  Share2,
-} from "lucide-react";
+   Phone,
+   PhoneOff,
+   Lightbulb,
+   Save,
+   Clock,
+   ChevronDown,
+   Timer,
+   Infinity,
+   ArrowRight,
+   Share2,
+ } from "lucide-react";
 import { Share } from "@capacitor/share";
 import Link from "next/link";
 import type { FriendWithProfile, Profile } from "@/app/_lib/types";
@@ -605,16 +604,10 @@ export default function HomePage() {
                    }
                  }
                }}
-              className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all w-full justify-center mb-3"
-            >
-              <Share2 className="w-4 h-4" /> Text a friend the link
-            </button>
-            <Link
-              href="/friends"
-              className="text-callme text-sm font-medium inline-flex items-center gap-1.5 border border-callme-200 px-5 py-2.5 rounded-[14px] hover:bg-callme-50 transition-colors w-full justify-center"
-            >
-              <Plus className="w-4 h-4" /> Add by username
-            </Link>
+              className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all w-full justify-center"
+             >
+               <Share2 className="w-4 h-4" /> Share your invite link
+             </button>
           </div>
         )}
 
