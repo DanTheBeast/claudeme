@@ -359,7 +359,46 @@ export default function FriendsPage() {
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Friends</h1>
+          <button
+            onClick={async () => {
+              try {
+                // Generate invite code using public API key (not user JWT)
+                const res = await fetch(
+                  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+                const json = await res.json();
+                
+                if (!res.ok) {
+                  toast(json.error || "Failed to generate invite code");
+                  return;
+                }
 
+                const code = json.code;
+                const deepLink = `callme://invite?code=${code}`;
+                
+                await Share.share({
+                  title: "Join me on CallMe",
+                  text: `I'm using CallMe to share when I'm free to call. Join me! Code: ${code}`,
+                  url: deepLink,
+                });
+              } catch (err: unknown) {
+                if (err instanceof Error && err.name !== "AbortError") {
+                  console.error("[CallMe] share failed:", err.message);
+                }
+              }
+            }}
+            className="callme-gradient text-white px-4 py-2 rounded-[10px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
+            title="Add Friends"
+          >
+            <UserPlus className="w-4 h-4" /> Add Friends
+          </button>
         </div>
       </header>
 

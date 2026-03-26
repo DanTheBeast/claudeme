@@ -591,10 +591,43 @@ export default function HomePage() {
              <button
                onClick={async () => {
                  try {
+                   // Get current session
+                   const { data: { session } } = await supabase.auth.getSession();
+                   console.log("[CallMe] session token:", { hasToken: !!session?.access_token, tokenLength: session?.access_token?.length });
+                   
+                   if (!session?.access_token) {
+                     toast("Not authenticated — try logging in again");
+                     return;
+                   }
+                   
+                   // Generate invite code using public API key (not user JWT)
+                   console.log("[CallMe] generating invite code...", { url: process.env.NEXT_PUBLIC_SUPABASE_URL, hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY });
+                   const res = await fetch(
+                     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
+                     {
+                       method: "POST",
+                       headers: {
+                         "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                         "Content-Type": "application/json",
+                       },
+                     }
+                   );
+                   console.log("[CallMe] fetch completed with status:", res.status);
+                   const json = await res.json();
+                   console.log("[CallMe] generate-invite-code response:", { status: res.status, json });
+                   
+                   if (!res.ok) {
+                     toast(json.error || "Failed to generate invite code");
+                     return;
+                   }
+
+                   const code = json.code;
+                   const deepLink = `callme://invite?code=${code}`;
+                   
                    await Share.share({
-                     title: "Download CallMe",
-                     text: "I've been using this app called CallMe to share when I'm free to talk. Way better than texting back and forth. Download it:",
-                     url: "https://apps.apple.com/app/just-call-me-app/id6759512338",
+                     title: "Join me on CallMe",
+                     text: `I'm using CallMe to share when I'm free to call. Join me! Code: ${code}`,
+                     url: deepLink,
                    });
                  } catch (err: unknown) {
                    // User cancelled share (AbortError) or share failed — silently ignore
