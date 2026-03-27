@@ -8,7 +8,7 @@ DROP POLICY IF EXISTS "Users can read invite codes to redeem them" ON invite_cod
 -- Policy: Users can insert their own invite codes (inviter_id must match their id)
 CREATE POLICY "Users can insert their own invite codes"
   ON invite_codes FOR INSERT
-  WITH CHECK (auth.uid() = inviter_id);
+  WITH CHECK ((select auth.uid()) = inviter_id);
 
 -- Policy: Anyone can read invite codes to validate/redeem them
 CREATE POLICY "Anyone can read invite codes"

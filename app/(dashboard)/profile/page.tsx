@@ -183,30 +183,38 @@ export default function ProfilePage() {
     }
   };
 
-  const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user || !e.target.files?.[0]) return;
-    const file = e.target.files[0];
-    // Reset the input so the same file can be reselected after a failure
-    e.target.value = "";
-    setUploadingPhoto(true);
-    try {
-      // Resize and compress to JPEG before uploading.
-      // iPhone photos can be 10-15MB — we only need ~400px for a profile pic.
-      const compressed = await resizeImage(file, 400, 0.85);
-      const path = `${user.id}/avatar.jpg`;
+   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+     if (!user || !e.target.files?.[0]) return;
+     const file = e.target.files[0];
+     // Reset the input so the same file can be reselected after a failure
+     e.target.value = "";
+     setUploadingPhoto(true);
+     try {
+       // Resize and compress to JPEG before uploading.
+       // iPhone photos can be 10-15MB — we only need ~400px for a profile pic.
+       const compressed = await resizeImage(file, 400, 0.85);
+       const path = `${user.id}/avatar.jpg`;
+       
+       // Verify we have a valid session before attempting upload
+       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+       if (sessionError || !session) {
+         throw new Error("Not authenticated — please log in again");
+       }
 
-       // Wrap the upload in a 60s timeout so a hung request never freezes the app.
-       // Camera photos on iOS can take extra time to decode (HEIC→JPEG conversion
-       // happens in the browser before resizeImage even starts), and slow networks need time too.
-       const timeout = new Promise<never>((_, reject) =>
-         setTimeout(() => reject(new Error("Upload timed out")), 60000)
-       );
-      const upload = supabase.storage
-        .from("avatars")
-        .upload(path, compressed, { upsert: true, contentType: "image/jpeg" });
+         // Wrap the upload in a 90s timeout (increased from 60s to account for policy propagation delays)
+         const timeout = new Promise<never>((_, reject) =>
+           setTimeout(() => reject(new Error("Upload timed out")), 90000)
+         );
+         const upload = supabase.storage
+           .from("avatars")
+           .upload(path, compressed, { upsert: true, contentType: "image/jpeg" });
 
-      const { error: uploadError } = await Promise.race([upload, timeout]);
-      if (uploadError) throw uploadError;
+         console.log("[CallMe] Starting upload:", { path, fileSize: compressed.size, userId: user.id });
+         const { data: uploadData, error: uploadError } = await Promise.race([upload, timeout]);
+         console.log("[CallMe] Upload completed:", { success: !uploadError, error: uploadError });
+         if (uploadError) {
+           throw new Error(`Storage error: ${uploadError.message || JSON.stringify(uploadError)}`);
+         }
 
       const { data: urlData } = supabase.storage
         .from("avatars")
@@ -216,19 +224,24 @@ export default function ProfilePage() {
       await refreshUser();
       setAvatarBust(String(Date.now()));
       toast("Photo updated!");
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : "";
-      const msg = errMsg === "Upload timed out"
-        ? "Upload timed out — check your connection and try again"
-        : errMsg === "Image decode timed out"
-        ? "Photo took too long to process — try again"
-        : errMsg === "Image load failed" || errMsg === "Canvas context unavailable"
-        ? "Couldn't process that photo — try a different one"
-        : errMsg === "Request timed out"
-        ? "Photo uploaded but profile update timed out — try again"
-        : "Failed to upload photo";
-      toast(msg);
-      feedbackError();
+     } catch (err: unknown) {
+       const errMsg = err instanceof Error ? err.message : String(err);
+       console.error("[CallMe] Photo upload error:", { errMsg, err });
+       const msg = errMsg === "Upload timed out"
+         ? "Upload timed out — try a smaller photo or check your WiFi"
+         : errMsg === "Image decode timed out"
+         ? "Photo took too long to process — try a different photo"
+         : errMsg === "Image load failed" || errMsg === "Canvas context unavailable"
+         ? "Couldn't process that photo — try a different one"
+         : errMsg === "Not authenticated — please log in again"
+         ? "Session expired — please log in again"
+         : errMsg === "Request timed out"
+         ? "Photo uploaded but profile update timed out — try again"
+         : errMsg.includes("Storage") || errMsg.includes("bucket")
+         ? "Photo service unavailable — try again in a moment"
+         : `Upload failed: ${errMsg}`;
+       toast(msg);
+       feedbackError();
     } finally {
       // Always clear the uploading state — never leave the spinner stuck
       setUploadingPhoto(false);

@@ -401,37 +401,41 @@ export default function DashboardLayout({
          }, 10000)
        );
 
-       try {
-         const channelPromise = supabase
-           .channel("profile-changes")
-           .on(
-             "postgres_changes",
-             {
-               event: "UPDATE",
-               schema: "public",
-               table: "profiles",
-               filter: `id=eq.${uid}`,
-             },
-             (payload) => {
-               setUser((current) => {
-                 if (current && payload.new.id === current.id) {
-                   return payload.new as Profile;
-                 }
-                 return current;
-               });
-             }
-           )
-           .subscribe();
+        try {
+          const channel = supabase
+            .channel(`profile-${uid}`, { config: { broadcast: { ack: true } } })
+            .on(
+              "postgres_changes",
+              {
+                event: "UPDATE",
+                schema: "public",
+                table: "profiles",
+                filter: `id=eq.${uid}`,
+              },
+              (payload) => {
+                setUser((current) => {
+                  if (current && payload.new.id === current.id) {
+                    return payload.new as Profile;
+                  }
+                  return current;
+                });
+              }
+            )
+            .subscribe((status, err) => {
+              if (err) {
+                console.error("[CallMe] Profile subscription error:", err);
+              }
+            });
 
-         // Wait for either subscription to succeed or timeout
-         return await Promise.race([
-           channelPromise,
-           timeoutPromise,
-         ]);
-       } catch {
-         // Network error or subscription failure — return null and let Realtime retry on next focus
-         return null;
-       }
+          // Wait for either subscription to succeed or timeout
+          return await Promise.race([
+            channel,
+            timeoutPromise,
+          ]);
+        } catch {
+          // Network error or subscription failure — return null and let Realtime retry on next focus
+          return null;
+        }
      };
      const channelPromise = getProfileChannel();
 

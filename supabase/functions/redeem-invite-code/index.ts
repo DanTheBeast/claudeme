@@ -54,7 +54,14 @@ Deno.serve(async (req) => {
     .eq("code", code)
     .maybeSingle();
 
-  if (lookupErr || !invite) {
+  if (lookupErr) {
+    console.error("[redeem-invite-code] code lookup failed:", lookupErr);
+    return new Response(JSON.stringify({ error: "Code lookup failed — try again" }), {
+      status: 500, headers: { ...CORS, "Content-Type": "application/json" },
+    });
+  }
+
+  if (!invite) {
     return new Response(JSON.stringify({ error: "Code not found — double-check and try again" }), {
       status: 404, headers: { ...CORS, "Content-Type": "application/json" },
     });
@@ -75,11 +82,18 @@ Deno.serve(async (req) => {
   }
 
   // Check if a friendship already exists in either direction — don't duplicate
-  const { data: existing } = await supabase
+  const { data: existing, error: existingErr } = await supabase
     .from("friendships")
     .select("id, status")
     .or(`and(user_id.eq.${user.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user.id})`)
     .maybeSingle();
+
+  if (existingErr) {
+    console.error("[redeem-invite-code] friendship check failed:", existingErr);
+    return new Response(JSON.stringify({ error: "Failed to check friendship — try again" }), {
+      status: 500, headers: { ...CORS, "Content-Type": "application/json" },
+    });
+  }
 
   if (!existing) {
     // Create a pending friend request from the redeemer to the inviter
@@ -88,6 +102,14 @@ Deno.serve(async (req) => {
       .insert({ user_id: user.id, friend_id: invite.inviter_id, status: "pending" });
 
     if (friendErr && !friendErr.message?.includes("duplicate")) {
+      console.error("[redeem-invite-code] friendship insert failed:", {
+        code,
+        user_id: user.id,
+        inviter_id: invite.inviter_id,
+        error: friendErr.message,
+        code: friendErr.code,
+        details: friendErr.details,
+      });
       return new Response(JSON.stringify({ error: "Failed to send friend request — try again" }), {
         status: 500, headers: { ...CORS, "Content-Type": "application/json" },
       });
