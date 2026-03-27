@@ -326,14 +326,12 @@ export default function DashboardLayout({
     // the session tokens in the URL so we can sign the user in immediately.
     const appUrlListenerPromise = CapApp.addListener("appUrlOpen", async (data: { url: string }) => {
       try {
-        console.log("[CallMe] Deep link received:", data.url);
         const url = new URL(data.url);
         // callme://invite?code=x7k2m9ab — opened from a personal invite link
         // url.host === "invite" because callme://invite parses "invite" as the host
         if (url.host === "invite") {
           const code = url.searchParams.get("code");
           const from = url.searchParams.get("from"); // legacy support
-          console.log("[CallMe] Invite code detected:", code || from);
           if (code) setPendingInviteFrom(code);
           else if (from) setPendingInviteFrom(from);
           return;
@@ -342,14 +340,11 @@ export default function DashboardLayout({
         const accessToken = url.searchParams.get("access_token");
         const refreshToken = url.searchParams.get("refresh_token") || "";
         if (accessToken) {
-          console.log("[CallMe] Auth callback detected");
           await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
           await fetchProfile();
           setRefreshKey((k) => k + 1);
         }
-      } catch (err) {
-        console.error("[CallMe] Deep link handler error:", err);
-      }
+      } catch {}
     }).catch(() => null);
 
     // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load.
