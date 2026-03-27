@@ -841,16 +841,14 @@ export default function FriendsPage() {
 
                     // Share the code FIRST (before saving to DB)
                     // This way if user cancels, we don't waste a code
-                     await Share.share({
-                       title: "Join me on CallMe",
-                       text: `I'm using CallMe to share when I'm free to call. To add me as a friend, use my invite code:
+                      await Share.share({
+                        title: "Join me on CallMe",
+                        text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy this entire message and paste it in the "Add Friends" section — it'll automatically extract the code:
 
 ${code}
 
-Paste it in the "Add Friends" section on the app.
-
 If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                     });
+                      });
 
                     // Now that share was successful, insert into database
                     const { error } = await supabase
