@@ -22,6 +22,12 @@ import {
 import { Share } from "@capacitor/share";
 import type { Profile, FriendWithProfile, Friendship } from "@/app/_lib/types";
 
+// Validate invite code format (8 chars from valid charset)
+const isValidCodeFormat = (code: string): boolean => {
+  const validChars = /^[23456789abcdefghjkmnpqrstuvwxyz]{8}$/;
+  return validChars.test(code);
+};
+
 export default function FriendsPage() {
    const { user, toast, refreshUser, refreshKey, pendingInviteFrom, clearPendingInvite } = useApp();
    // Stable client — avoids a new instance on every render
@@ -48,6 +54,8 @@ export default function FriendsPage() {
    const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
    const [inviteCodeInput, setInviteCodeInput] = useState("");
    const [redeemingCode, setRedeemingCode] = useState(false);
+   const [lastCodeGeneratedTime, setLastCodeGeneratedTime] = useState<number>(0);
+   const [sharingCode, setSharingCode] = useState(false);
 
 
 
@@ -605,8 +613,8 @@ export default function FriendsPage() {
                 type="text"
                 value={inviteCodeInput}
                 onChange={(e) => setInviteCodeInput(e.target.value.toLowerCase().trim())}
-                placeholder="e.g. abc12345"
-                maxLength={12}
+                placeholder="8 characters"
+                maxLength={8}
                 autoCorrect="off"
                 autoCapitalize="none"
                 className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
@@ -616,6 +624,12 @@ export default function FriendsPage() {
               <button
                 disabled={inviteCodeInput.length < 4 || redeemingCode}
                 onClick={async () => {
+                  // Validate code format before database query
+                  if (!isValidCodeFormat(inviteCodeInput)) {
+                    toast("Invalid code format — should be 8 characters");
+                    return;
+                  }
+
                   setRedeemingCode(true);
                   try {
                     const { data: invite, error: lookupErr } = await supabase
@@ -664,11 +678,22 @@ export default function FriendsPage() {
                       }
                     }
 
-                    // Mark code as used
-                    await supabase
+                    // Mark code as used (with race condition protection via unique constraint)
+                    const { error: updateErr } = await supabase
                       .from("invite_codes")
                       .update({ used_by: user?.id, used_at: new Date().toISOString() })
                       .eq("code", inviteCodeInput);
+
+                    if (updateErr) {
+                      // Unique constraint violation means another user already claimed this code
+                      if (updateErr.message?.includes("unique constraint")) {
+                        toast("Someone just claimed this code — try another one!");
+                      } else {
+                        toast("Failed to claim code — try again");
+                      }
+                      setRedeemingCode(false);
+                      return;
+                    }
 
                     if (existing) {
                       toast(`You're already friends with @${invite.inviter_username}!`);
@@ -710,20 +735,41 @@ export default function FriendsPage() {
               </p>
               
               <button
+                disabled={sharingCode}
                 onClick={async () => {
                   try {
                     if (!user) {
                       toast("Not authenticated");
                       return;
                     }
+
+                    // Rate limiting: prevent spamming code generation (max 1 code every 5 seconds)
+                    const now = Date.now();
+                    if (now - lastCodeGeneratedTime < 5000) {
+                      toast("Wait a moment before generating another code");
+                      return;
+                    }
                     
+                    setSharingCode(true);
+
                     // Generate a random invite code locally
                     const chars = "23456789abcdefghjkmnpqrstuvwxyz";
                     const bytes = new Uint8Array(8);
                     crypto.getRandomValues(bytes);
                     const code = Array.from(bytes).map((b) => chars[b % chars.length]).join("");
-                    
-                    // Insert into database
+
+                    // Share the code FIRST (before saving to DB)
+                    // This way if user cancels, we don't waste a code
+                    await Share.share({
+                      title: "Join me on CallMe",
+                      text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy my invite code and paste it in the "Add Friends" section:
+
+${code}
+
+If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
+                    });
+
+                    // Now that share was successful, insert into database
                     const { error } = await supabase
                       .from("invite_codes")
                       .insert({
@@ -733,33 +779,35 @@ export default function FriendsPage() {
                       });
 
                     if (error) {
-                      toast("Failed to generate code — try again");
+                      console.error("[CallMe] failed to save code:", error);
+                      toast("Code shared but failed to save — may need to reshare");
                       return;
                     }
 
-                    // Share the code
-                    await Share.share({
-                      title: "Join me on CallMe",
-                      text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy my invite code and paste it in the "Add Friends" section:
-
-${code}
-
-If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                    });
+                    // Update rate limit timestamp
+                    setLastCodeGeneratedTime(now);
                   } catch (err: unknown) {
                     if (err instanceof Error && err.name !== "AbortError") {
                       console.error("[CallMe] share failed:", err.message);
                     }
+                  } finally {
+                    setSharingCode(false);
                   }
                 }}
-                className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
+                className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-lg hover:shadow-callme/25 transition-all"
               >
-                <Share2 className="w-4 h-4" /> Share Your Code
+                {sharingCode
+                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sharing…</>
+                  : <><Share2 className="w-4 h-4" /> Share Your Code</>
+                }
               </button>
             </div>
 
             <button
-              onClick={() => setShowAddFriendsModal(false)}
+              onClick={() => {
+                setShowAddFriendsModal(false);
+                setInviteCodeInput("");
+              }}
               className="w-full text-gray-400 text-sm py-2 hover:text-gray-600 transition-colors mt-3"
             >
               Close

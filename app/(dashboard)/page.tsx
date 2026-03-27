@@ -54,6 +54,7 @@ export default function HomePage() {
   const [mood, setMood] = useState(user?.current_mood || "");
   const [moodDirty, setMoodDirty] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(true);
+  const [lastCodeGeneratedTime, setLastCodeGeneratedTime] = useState<number>(0);
   const friendsLoadedOnce = useRef(false);
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
@@ -591,8 +592,16 @@ export default function HomePage() {
              <button
                onClick={async () => {
                  try {
+                   const now = Date.now();
+
                    if (!user) {
                      toast("Not authenticated — try logging in again");
+                     return;
+                   }
+
+                   // Rate limiting: prevent spamming code generation (max 1 code every 5 seconds)
+                   if (now - lastCodeGeneratedTime < 5000) {
+                     toast("Wait a moment before generating another code");
                      return;
                    }
                    
@@ -618,6 +627,9 @@ export default function HomePage() {
                      toast("Failed to generate invite code — try again");
                      return;
                    }
+
+                   // Update rate limit timestamp
+                   setLastCodeGeneratedTime(now);
                    
                    await Share.share({
                      title: "Join me on CallMe",
