@@ -684,22 +684,21 @@ export default function FriendsPage() {
               </p>
               
               {/* Code input */}
-               <input
-                 type="text"
-                 value={inviteCodeInput}
-                 onChange={(e) => {
-                   const input = e.target.value.toLowerCase().trim();
-                   // Extract 8-char code from any pasted text (handles full message pastes)
-                   const codeMatch = input.match(/[23456789abcdefghjkmnpqrstuvwxyz]{8}/);
-                   const extracted = codeMatch ? codeMatch[0] : input;
-                   setInviteCodeInput(extracted);
-                 }}
-                 placeholder="8 characters (paste full message if needed)"
-                 maxLength={8}
-                 autoCorrect="off"
-                 autoCapitalize="none"
-                 className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
-               />
+                <input
+                  type="text"
+                  value={inviteCodeInput}
+                  onChange={(e) => {
+                    const input = e.target.value.toLowerCase().trim();
+                    // Extract 8-char code from any pasted text (handles full message pastes)
+                    const codeMatch = input.match(/[23456789abcdefghjkmnpqrstuvwxyz]{8}/);
+                    const extracted = codeMatch ? codeMatch[0] : input.slice(0, 8);
+                    setInviteCodeInput(extracted);
+                  }}
+                  placeholder="Paste the invite code"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
+                />
               
               {/* Redeem button */}
               <button
