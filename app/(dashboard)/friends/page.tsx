@@ -55,12 +55,14 @@ export default function FriendsPage() {
    // and React warnings when rapidly switching between pages
    const isMounted = useRef(true);
    
-   // Add Friends modal state
-   const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
-   const [inviteCodeInput, setInviteCodeInput] = useState("");
-   const [redeemingCode, setRedeemingCode] = useState(false);
-   const [lastCodeGeneratedTime, setLastCodeGeneratedTime] = useState<number>(0);
-   const [sharingCode, setSharingCode] = useState(false);
+    // Add Friends modal state
+    const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
+    const [inviteCodeInput, setInviteCodeInput] = useState("");
+    const [redeemingCode, setRedeemingCode] = useState(false);
+    const [lastCodeGeneratedTime, setLastCodeGeneratedTime] = useState<number>(0);
+    const [sharingCode, setSharingCode] = useState(false);
+    
+
 
 
 
@@ -208,11 +210,77 @@ export default function FriendsPage() {
     }
     loadData();
 
-    // Cleanup: mark component as unmounted so pending promises don't update state
+    // Subscribe to real-time friend request updates
+    const channel = supabase
+      .channel(`friends-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "friendships",
+          filter: `friend_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // New incoming friend request
+          if (isMounted.current) {
+            loadData();
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "friendships",
+          filter: `friend_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Incoming request status changed (e.g., being declined, or we need to reload)
+          if (isMounted.current) {
+            loadData();
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "friendships",
+          filter: `friend_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Incoming request was deleted (e.g., requester cancelled)
+          if (isMounted.current) {
+            loadData();
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "friendships",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          // Any change to outgoing friend requests
+          if (isMounted.current) {
+            loadData();
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup: unsubscribe and mark component as unmounted
     return () => {
       isMounted.current = false;
+      supabase.removeChannel(channel);
     };
-   }, [user?.id, refreshKey]);
+    }, [user?.id, refreshKey]);
 
   // Debounced search — only shows users who allow friend requests,
   // and filters out people already friended or with a pending request.
@@ -370,11 +438,13 @@ export default function FriendsPage() {
    // Memoize categorized friends lists
    const available = useMemo(() => filteredFriends.filter((f) => !f.is_muted && f.friend.is_available), [filteredFriends]);
    const offline = useMemo(() => filteredFriends.filter((f) => !f.is_muted && !f.friend.is_available), [filteredFriends]);
-   const muted = useMemo(() => filteredFriends.filter((f) => f.is_muted), [filteredFriends]);
+    const muted = useMemo(() => filteredFriends.filter((f) => f.is_muted), [filteredFriends]);
 
-  return (
-    <div className="pb-24">
-      <header className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col overflow-visible" style={{ top: 0 }}>
+
+
+   return (
+     <div className="pb-24">
+       <header className="app-header bg-white backdrop-blur-sm border-b border-gray-100/80 fixed left-0 right-0 z-30 flex flex-col overflow-visible" style={{ top: 0 }}>
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Friends</h1>
@@ -718,11 +788,11 @@ export default function FriendsPage() {
                   }
                 }}
                 className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-lg hover:shadow-callme/25 transition-all"
-              >
-                {redeemingCode
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Redeeming…</>
-                  : "Redeem Code"
-                }
+               >
+                 {redeemingCode
+                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Connecting…</>
+                   : "Connect with Code"
+                 }
               </button>
             </div>
 
