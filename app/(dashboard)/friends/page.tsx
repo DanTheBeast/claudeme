@@ -42,91 +42,8 @@ export default function FriendsPage() {
    // Guard against state updates on unmounted component — prevents memory leaks
    // and React warnings when rapidly switching between pages
    const isMounted = useRef(true);
-   
-   // Add Friends modal state
-   const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
-   const [inviteCodeInput, setInviteCodeInput] = useState("");
-   const [redeemingCode, setRedeemingCode] = useState(false);
 
 
-
-  const redeemCodeFromModal = async (code: string) => {
-    if (!user) {
-      toast("Not authenticated");
-      return;
-    }
-
-    setRedeemingCode(true);
-    try {
-      const cleanCode = code.trim().toLowerCase();
-      console.log("[CallMe] redeeming code:", cleanCode);
-      
-      // Look up the code
-      const { data: invite, error: lookupErr } = await supabase
-        .from("invite_codes")
-        .select("code, inviter_id, inviter_username, used_by")
-        .eq("code", cleanCode)
-        .maybeSingle();
-
-      if (lookupErr || !invite) {
-        toast("Code not found — double-check and try again");
-        setRedeemingCode(false);
-        return;
-      }
-
-      // Can't redeem your own code
-      if (invite.inviter_id === user.id) {
-        toast("That's your own invite code!");
-        setRedeemingCode(false);
-        return;
-      }
-
-      // If already used by someone else, reject
-      if (invite.used_by && invite.used_by !== user.id) {
-        toast("This code has already been used");
-        setRedeemingCode(false);
-        return;
-      }
-
-      // Check if a friendship already exists
-      const { data: existing } = await supabase
-        .from("friendships")
-        .select("id, status")
-        .or(`and(user_id.eq.${user.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user.id})`)
-        .maybeSingle();
-
-      if (!existing) {
-        // Create a pending friend request from current user to inviter
-        const { error: friendErr } = await supabase
-          .from("friendships")
-          .insert({ user_id: user.id, friend_id: invite.inviter_id, status: "pending" });
-
-        if (friendErr && !friendErr.message?.includes("duplicate")) {
-          toast("Failed to send friend request");
-          setRedeemingCode(false);
-          return;
-        }
-      }
-
-      // Mark code as used
-      await supabase
-        .from("invite_codes")
-        .update({ used_by: user.id, used_at: new Date().toISOString() })
-        .eq("code", cleanCode);
-
-      toast(`Friend request sent to ${invite.inviter_username}!`);
-      setInviteCodeInput("");
-      setShowAddFriendsModal(false);
-      setRedeemingCode(false);
-      
-      // Refresh the friends list
-      loadData();
-    } catch (err) {
-      console.error("[CallMe] redeem error:", err);
-      toast("Failed to redeem code");
-      setRedeemingCode(false);
-    }
-  };
 
   const loadData = async () => {
     if (!user) return;
@@ -347,78 +264,43 @@ export default function FriendsPage() {
       refreshUser(); // refreshes pending badge count
     };
 
-  // Called when the app is opened via a callme://invite?code=... deep link.
-  // Uses direct database queries to validate code and create friend request.
-  const redeemInviteCode = async (code: string) => {
+  // Called when the app is opened via a callme://invite?code=... deep link,
+  // or when a user enters a code manually. Routes through the redeem-invite-code
+  // Edge Function which validates the code and creates the friend request.
+  const redeemInviteCode = async (codeOrUsername: string) => {
     if (!user) return;
     setSendingInviteRequest(true);
     try {
-      const cleanCode = code.trim().toLowerCase();
-      console.log("[CallMe] redeeming invite code from deep link:", cleanCode);
-      
-      // Look up the code
-      const { data: invite, error: lookupErr } = await supabase
-        .from("invite_codes")
-        .select("code, inviter_id, inviter_username, used_by")
-        .eq("code", cleanCode)
-        .maybeSingle();
-
-      if (lookupErr || !invite) {
-        toast("Code not found — double-check and try again");
-        clearPendingInvite();
-        return;
-      }
-
-      // Can't redeem your own code
-      if (invite.inviter_id === user.id) {
-        toast("That's your own invite code!");
-        clearPendingInvite();
-        return;
-      }
-
-      // If already used by someone else, reject
-      if (invite.used_by && invite.used_by !== user.id) {
-        toast("This code has already been used");
-        clearPendingInvite();
-        return;
-      }
-
-      // Check if a friendship already exists
-      const { data: existing } = await supabase
-        .from("friendships")
-        .select("id, status")
-        .or(`and(user_id.eq.${user.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user.id})`)
-        .maybeSingle();
-
-      if (!existing) {
-        // Create a pending friend request from current user to inviter
-        const { error: friendErr } = await supabase
-          .from("friendships")
-          .insert({ user_id: user.id, friend_id: invite.inviter_id, status: "pending" });
-
-        if (friendErr && !friendErr.message?.includes("duplicate")) {
-          toast("Failed to send friend request");
-          return;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session?.access_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ code: codeOrUsername }),
         }
+      );
+      const json = await res.json();
+      if (!res.ok) {
+        toast(json.error || "Something went wrong — try again");
+        // Only clear banner for terminal errors (not retryable network issues)
+        if (res.status !== 500) clearPendingInvite();
+        return;
       }
-
-      // Mark code as used
-      await supabase
-        .from("invite_codes")
-        .update({ used_by: user.id, used_at: new Date().toISOString() })
-        .eq("code", cleanCode);
-
-      if (existing) {
-        toast(`You're already friends with @${invite.inviter_username}!`);
+      if (json.already_friends) {
+        toast(`You're already friends with @${json.inviter_username}!`);
       } else {
         feedbackFriendAdded();
-        toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
+        toast(`Friend request sent to @${json.inviter_username}! 🎉`);
       }
       clearPendingInvite();
       loadData();
-    } catch (err) {
-      console.error("[CallMe] redeem error:", err);
-      toast("Failed to redeem code");
+    } catch {
+      // Network error — keep banner so user can retry
+      toast("Something went wrong — check your connection and try again");
     } finally {
       setSendingInviteRequest(false);
     }
@@ -478,7 +360,40 @@ export default function FriendsPage() {
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Friends</h1>
           <button
-            onClick={() => setShowAddFriendsModal(true)}
+            onClick={async () => {
+              try {
+                // Generate invite code using public API key (not user JWT)
+                const res = await fetch(
+                  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+                const json = await res.json();
+                
+                if (!res.ok) {
+                  toast(json.error || "Failed to generate invite code");
+                  return;
+                }
+
+                const code = json.code;
+                const deepLink = `callme://invite?code=${code}`;
+                
+                await Share.share({
+                  title: "Join me on CallMe",
+                  text: `I'm using CallMe to share when I'm free to call. Join me! Code: ${code}`,
+                  url: deepLink,
+                });
+              } catch (err: unknown) {
+                if (err instanceof Error && err.name !== "AbortError") {
+                  console.error("[CallMe] share failed:", err.message);
+                }
+              }
+            }}
             className="callme-gradient text-white px-4 py-2 rounded-[10px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
             title="Add Friends"
           >
@@ -784,103 +699,6 @@ export default function FriendsPage() {
       </BottomSheet>
 
 
-      {/* Add Friends Modal */}
-      <BottomSheet open={showAddFriendsModal} onClose={() => { setShowAddFriendsModal(false); setInviteCodeInput(""); }}>
-        <div className="flex flex-col gap-5">
-          <div>
-            <h2 className="font-display text-xl font-bold mb-2">Add Friends</h2>
-            <p className="text-gray-500 text-sm">Enter a code you received or share yours</p>
-          </div>
-
-          {/* Code input section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Enter invite code</label>
-            <input
-              type="text"
-              value={inviteCodeInput}
-              onChange={(e) => setInviteCodeInput(e.target.value.toUpperCase())}
-              placeholder="e.g., ABC12345"
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-[12px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all"
-              disabled={redeemingCode}
-            />
-          </div>
-
-          {/* Redeem button */}
-          <button
-            onClick={() => {
-              if (inviteCodeInput.trim()) {
-                redeemCodeFromModal(inviteCodeInput);
-              } else {
-                toast("Please enter a code");
-              }
-            }}
-            disabled={redeemingCode || !inviteCodeInput.trim()}
-            className={`w-full px-5 py-3 rounded-[12px] text-sm font-semibold text-white transition-all ${
-              redeemingCode || !inviteCodeInput.trim()
-                ? "bg-gray-300 cursor-not-allowed"
-                : "callme-gradient hover:shadow-lg hover:shadow-callme/25"
-            }`}
-          >
-            {redeemingCode ? "Redeeming..." : "Redeem Code"}
-          </button>
-
-          {/* Or divider */}
-          <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="text-sm text-gray-400">or</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          {/* Share your code section */}
-          <button
-            onClick={async () => {
-              try {
-                if (!user) {
-                  toast("Not authenticated");
-                  return;
-                }
-                
-                // Generate a random invite code locally
-                const chars = "23456789abcdefghjkmnpqrstuvwxyz";
-                const bytes = new Uint8Array(8);
-                crypto.getRandomValues(bytes);
-                const code = Array.from(bytes).map((b) => chars[b % chars.length]).join("");
-                
-                // Insert into database
-                const { error } = await supabase
-                  .from("invite_codes")
-                  .insert({
-                    code: code,
-                    inviter_id: user.id,
-                    inviter_username: user.username,
-                  });
-                
-                if (error) {
-                  toast("Failed to generate code");
-                  return;
-                }
-                
-                const deepLink = `callme://invite?code=${code}`;
-                
-                await Share.share({
-                  title: "Join me on CallMe",
-                  text: `I'm using CallMe to share when I'm free to call. Join me with code: ${code}
-
-If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                  url: deepLink,
-                });
-              } catch (err: unknown) {
-                if (err instanceof Error && err.name !== "AbortError") {
-                  console.error("Share failed:", err.message);
-                }
-              }
-            }}
-            className="w-full px-5 py-3 bg-white border border-gray-200 rounded-[12px] text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all"
-          >
-            Share Your Code
-          </button>
-        </div>
-      </BottomSheet>
     </div>
   );
 }
