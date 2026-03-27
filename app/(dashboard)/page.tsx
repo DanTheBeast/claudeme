@@ -591,42 +591,41 @@ export default function HomePage() {
              <button
                onClick={async () => {
                  try {
-                   // Get current session
-                   const { data: { session } } = await supabase.auth.getSession();
-                   console.log("[CallMe] session token:", { hasToken: !!session?.access_token, tokenLength: session?.access_token?.length });
-                   
-                   if (!session?.access_token) {
+                   if (!user) {
                      toast("Not authenticated — try logging in again");
                      return;
                    }
                    
-                   // Generate invite code using public API key (not user JWT)
-                   console.log("[CallMe] generating invite code...", { url: process.env.NEXT_PUBLIC_SUPABASE_URL, hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY });
-                   const res = await fetch(
-                     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
-                     {
-                       method: "POST",
-                       headers: {
-                         "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-                         "Content-Type": "application/json",
-                       },
-                     }
-                   );
-                   console.log("[CallMe] fetch completed with status:", res.status);
-                   const json = await res.json();
-                   console.log("[CallMe] generate-invite-code response:", { status: res.status, json });
+                   // Generate a random invite code locally
+                   const chars = "23456789abcdefghjkmnpqrstuvwxyz";
+                   const bytes = new Uint8Array(8);
+                   crypto.getRandomValues(bytes);
+                   const code = Array.from(bytes).map((b) => chars[b % chars.length]).join("");
                    
-                   if (!res.ok) {
-                     toast(json.error || "Failed to generate invite code");
+                   console.log("[CallMe] generated code locally:", code);
+                   
+                   // Insert directly into Supabase using user's session
+                   const { error } = await supabase
+                     .from("invite_codes")
+                     .insert({
+                       code: code,
+                       inviter_id: user.id,
+                       inviter_username: user.username,
+                     });
+                   
+                   if (error) {
+                     console.error("[CallMe] failed to save code:", error);
+                     toast("Failed to generate invite code — try again");
                      return;
                    }
-
-                   const code = json.code;
+                   
                    const deepLink = `callme://invite?code=${code}`;
                    
                    await Share.share({
                      title: "Join me on CallMe",
-                     text: `I'm using CallMe to share when I'm free to call. Join me! Code: ${code}`,
+                     text: `I'm using CallMe to share when I'm free to call. Join me with code: ${code}
+
+If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
                      url: deepLink,
                    });
                  } catch (err: unknown) {
