@@ -619,14 +619,13 @@ export default function HomePage() {
                      return;
                    }
                    
-                   const deepLink = `callme://invite?code=${code}`;
-                   
                    await Share.share({
                      title: "Join me on CallMe",
-                     text: `I'm using CallMe to share when I'm free to call. Join me with code: ${code}
+                     text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy my invite code and paste it in the "Add Friends" section:
+
+${code}
 
 If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                     url: deepLink,
                    });
                  } catch (err: unknown) {
                    // User cancelled share (AbortError) or share failed — silently ignore

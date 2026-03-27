@@ -42,6 +42,11 @@ export default function FriendsPage() {
    // Guard against state updates on unmounted component — prevents memory leaks
    // and React warnings when rapidly switching between pages
    const isMounted = useRef(true);
+   
+   // Add Friends modal state
+   const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
+   const [inviteCodeInput, setInviteCodeInput] = useState("");
+   const [redeemingCode, setRedeemingCode] = useState(false);
 
 
 
@@ -360,40 +365,7 @@ export default function FriendsPage() {
         <div className="px-5 py-3.5 flex items-center justify-between">
           <h1 className="font-display text-xl font-bold">Friends</h1>
           <button
-            onClick={async () => {
-              try {
-                // Generate invite code using public API key (not user JWT)
-                const res = await fetch(
-                  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/generate-invite-code`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-                      "Content-Type": "application/json",
-                    },
-                  }
-                );
-                const json = await res.json();
-                
-                if (!res.ok) {
-                  toast(json.error || "Failed to generate invite code");
-                  return;
-                }
-
-                const code = json.code;
-                const deepLink = `callme://invite?code=${code}`;
-                
-                await Share.share({
-                  title: "Join me on CallMe",
-                  text: `I'm using CallMe to share when I'm free to call. Join me! Code: ${code}`,
-                  url: deepLink,
-                });
-              } catch (err: unknown) {
-                if (err instanceof Error && err.name !== "AbortError") {
-                  console.error("[CallMe] share failed:", err.message);
-                }
-              }
-            }}
+            onClick={() => setShowAddFriendsModal(true)}
             className="callme-gradient text-white px-4 py-2 rounded-[10px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
             title="Add Friends"
           >
@@ -606,6 +578,128 @@ export default function FriendsPage() {
           </div>
         )}
       </main>
+
+            {/* "Add Friends" modal */}
+      {showAddFriendsModal && (
+        <div
+          className="fixed inset-0 z-[300] bg-black/40 backdrop-blur-[4px] flex items-end justify-center"
+          onClick={() => setShowAddFriendsModal(false)}
+        >
+          <div
+            className="bg-white rounded-t-[28px] w-full max-w-md px-6 pt-3 pb-10 anim-slide-up"
+            style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mb-6" />
+            <h3 className="font-display text-xl font-bold mb-1">Add Friends</h3>
+            <p className="text-sm text-gray-400 mb-5 leading-relaxed">
+              Enter an invite code from someone you want to be friends with.
+            </p>
+            
+            {/* Code input */}
+            <input
+              type="text"
+              value={inviteCodeInput}
+              onChange={(e) => setInviteCodeInput(e.target.value.toLowerCase().trim())}
+              placeholder="e.g. abc12345"
+              maxLength={12}
+              autoCorrect="off"
+              autoCapitalize="none"
+              className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
+            />
+            
+            {/* Redeem button */}
+            <button
+              disabled={inviteCodeInput.length < 4 || redeemingCode}
+              onClick={async () => {
+                setRedeemingCode(true);
+                try {
+                  const { data: invite, error: lookupErr } = await supabase
+                    .from("invite_codes")
+                    .select("code, inviter_id, inviter_username, used_by")
+                    .eq("code", inviteCodeInput)
+                    .maybeSingle();
+
+                  if (lookupErr || !invite) {
+                    toast("Code not found — double-check and try again");
+                    setRedeemingCode(false);
+                    return;
+                  }
+
+                  // Can't redeem your own code
+                  if (invite.inviter_id === user?.id) {
+                    toast("That's your own invite code!");
+                    setRedeemingCode(false);
+                    return;
+                  }
+
+                  // If already used by someone else, reject
+                  if (invite.used_by && invite.used_by !== user?.id) {
+                    toast("This code has already been used");
+                    setRedeemingCode(false);
+                    return;
+                  }
+
+                  // Check if a friendship already exists
+                  const { data: existing } = await supabase
+                    .from("friendships")
+                    .select("id, status")
+                    .or(`and(user_id.eq.${user?.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user?.id})`)
+                    .maybeSingle();
+
+                  if (!existing) {
+                    // Create a pending friend request from current user to inviter
+                    const { error: friendErr } = await supabase
+                      .from("friendships")
+                      .insert({ user_id: user?.id, friend_id: invite.inviter_id, status: "pending" });
+
+                    if (friendErr && !friendErr.message?.includes("duplicate")) {
+                      toast("Failed to send friend request");
+                      setRedeemingCode(false);
+                      return;
+                    }
+                  }
+
+                  // Mark code as used
+                  await supabase
+                    .from("invite_codes")
+                    .update({ used_by: user?.id, used_at: new Date().toISOString() })
+                    .eq("code", inviteCodeInput);
+
+                  if (existing) {
+                    toast(`You're already friends with @${invite.inviter_username}!`);
+                  } else {
+                    feedbackFriendAdded();
+                    toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
+                  }
+                  
+                  setInviteCodeInput("");
+                  setShowAddFriendsModal(false);
+                  loadData();
+                } catch (err) {
+                  console.error("[CallMe] redeem error:", err);
+                  toast("Failed to redeem code");
+                } finally {
+                  setRedeemingCode(false);
+                }
+              }}
+              className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 mb-3 hover:shadow-lg hover:shadow-callme/25 transition-all"
+            >
+              {redeemingCode
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Redeeming…</>
+                : "Add Friend"
+              }
+            </button>
+            
+            <button
+              onClick={() => setShowAddFriendsModal(false)}
+              className="w-full text-gray-400 text-sm py-2 hover:text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Friend Detail Sheet */}
       <BottomSheet open={!!selectedFriend} onClose={() => { setSelectedFriend(null); setConfirmRemove(false); }}>
