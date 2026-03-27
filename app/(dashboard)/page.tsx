@@ -631,14 +631,16 @@ export default function HomePage() {
                    // Update rate limit timestamp
                    setLastCodeGeneratedTime(now);
                    
-                   await Share.share({
-                     title: "Join me on CallMe",
-                     text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy my invite code and paste it in the "Add Friends" section:
+                    await Share.share({
+                      title: "Join me on CallMe",
+                      text: `I'm using CallMe to share when I'm free to call. To add me as a friend, use my invite code:
 
 ${code}
 
+Paste it in the "Add Friends" section on the app.
+
 If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                   });
+                    });
                  } catch (err: unknown) {
                    // User cancelled share (AbortError) or share failed — silently ignore
                    // Only log actual errors, not user cancellations
