@@ -30,6 +30,11 @@ const isValidCodeFormat = (code: string): boolean => {
 
 export default function FriendsPage() {
    const { user, toast, refreshUser, refreshKey, pendingInviteFrom, clearPendingInvite } = useApp();
+   
+   // Type guard: ensure user is authenticated
+   if (!user || !user.id) {
+     return <div className="flex items-center justify-center h-screen">Loading...</div>;
+   }
    // Stable client — avoids a new instance on every render
    const supabase = useMemo(() => createClient(), []);
 
@@ -639,7 +644,7 @@ export default function FriendsPage() {
                       .maybeSingle();
 
                     if (lookupErr || !invite) {
-                      toast("Code not found — double-check and try again");
+                      toast("Code not found — check spelling and try again");
                       setRedeemingCode(false);
                       return;
                     }
@@ -672,7 +677,7 @@ export default function FriendsPage() {
                         .insert({ user_id: user?.id, friend_id: invite.inviter_id, status: "pending" });
 
                       if (friendErr && !friendErr.message?.includes("duplicate")) {
-                        toast("Failed to send friend request");
+                        toast("Couldn't send friend request — try again");
                         setRedeemingCode(false);
                         return;
                       }
@@ -707,7 +712,7 @@ export default function FriendsPage() {
                     loadData();
                   } catch (err) {
                     console.error("[CallMe] redeem error:", err);
-                    toast("Failed to redeem code");
+                    toast("Couldn't redeem code — try again");
                   } finally {
                     setRedeemingCode(false);
                   }

@@ -647,10 +647,10 @@ If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-
                    }
                  }
                }}
-              className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all w-full justify-center"
-             >
-               <Share2 className="w-4 h-4" /> Share your invite link
-             </button>
+               className="callme-gradient text-white px-6 py-3 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all w-full justify-center"
+              >
+                <Share2 className="w-4 h-4" /> Share your invite code
+              </button>
           </div>
         )}
 
