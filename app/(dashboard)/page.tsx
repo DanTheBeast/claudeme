@@ -613,20 +613,20 @@ export default function HomePage() {
                    
                    console.log("[CallMe] generated code locally:", code);
                    
-                   // Insert directly into Supabase using user's session
-                   const { error } = await supabase
-                     .from("invite_codes")
-                     .insert({
-                       code: code,
-                       inviter_id: user.id,
-                       inviter_username: user.username,
-                     });
-                   
-                   if (error) {
-                     console.error("[CallMe] failed to save code:", error);
-                     toast("Failed to generate invite code — try again");
-                     return;
-                   }
+                    // Insert directly into Supabase using user's session
+                    const { error } = await withTimeout(supabase
+                      .from("invite_codes")
+                      .insert({
+                        code: code,
+                        inviter_id: user.id,
+                        inviter_username: user.username,
+                      }));
+                    
+                    if (error) {
+                      console.error("[CallMe] failed to save code:", error);
+                      toast("Failed to save code — try again");
+                      return;
+                    }
 
                    // Update rate limit timestamp
                    setLastCodeGeneratedTime(now);

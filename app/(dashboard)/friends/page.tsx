@@ -210,67 +210,30 @@ export default function FriendsPage() {
     }
     loadData();
 
+    // Debounce Realtime updates to avoid hammering the database with concurrent queries
+    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedReload = () => {
+      if (reloadTimer) clearTimeout(reloadTimer);
+      reloadTimer = setTimeout(() => {
+        if (isMounted.current) {
+          loadData();
+        }
+      }, 1000); // Wait 1s after last change before reloading
+    };
+
     // Subscribe to real-time friend request updates
     const channel = supabase
       .channel(`friends-${user.id}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
-          schema: "public",
-          table: "friendships",
-          filter: `friend_id=eq.${user.id}`,
-        },
-        (payload) => {
-          // New incoming friend request
-          if (isMounted.current) {
-            loadData();
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "friendships",
-          filter: `friend_id=eq.${user.id}`,
-        },
-        (payload) => {
-          // Incoming request status changed (e.g., being declined, or we need to reload)
-          if (isMounted.current) {
-            loadData();
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "friendships",
-          filter: `friend_id=eq.${user.id}`,
-        },
-        (payload) => {
-          // Incoming request was deleted (e.g., requester cancelled)
-          if (isMounted.current) {
-            loadData();
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
           event: "*",
           schema: "public",
           table: "friendships",
-          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          // Any change to outgoing friend requests
-          if (isMounted.current) {
-            loadData();
-          }
+          // Any change to friendships (incoming or outgoing) - debounce the reload
+          debouncedReload();
         }
       )
       .subscribe();
@@ -278,6 +241,7 @@ export default function FriendsPage() {
     // Cleanup: unsubscribe and mark component as unmounted
     return () => {
       isMounted.current = false;
+      if (reloadTimer) clearTimeout(reloadTimer);
       supabase.removeChannel(channel);
     };
     }, [user?.id, refreshKey]);
@@ -694,7 +658,7 @@ export default function FriendsPage() {
                     const extracted = codeMatch ? codeMatch[0] : input.slice(0, 8);
                     setInviteCodeInput(extracted);
                   }}
-                  placeholder="Paste the invite code"
+                  placeholder="Paste or type the invite code"
                   autoCorrect="off"
                   autoCapitalize="none"
                   className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
@@ -710,19 +674,19 @@ export default function FriendsPage() {
                     return;
                   }
 
-                  setRedeemingCode(true);
-                  try {
-                    const { data: invite, error: lookupErr } = await supabase
-                      .from("invite_codes")
-                      .select("code, inviter_id, inviter_username, used_by")
-                      .eq("code", inviteCodeInput)
-                      .maybeSingle();
+                   setRedeemingCode(true);
+                   try {
+                     const { data: invite, error: lookupErr } = await withTimeout(supabase
+                       .from("invite_codes")
+                       .select("code, inviter_id, inviter_username, used_by")
+                       .eq("code", inviteCodeInput)
+                       .maybeSingle());
 
-                    if (lookupErr || !invite) {
-                      toast("Code not found — check spelling and try again");
-                      setRedeemingCode(false);
-                      return;
-                    }
+                     if (lookupErr || !invite) {
+                       toast("Code not found — check spelling and try again");
+                       setRedeemingCode(false);
+                       return;
+                     }
 
                     // Can't redeem your own code
                     if (invite.inviter_id === user?.id) {
@@ -738,18 +702,18 @@ export default function FriendsPage() {
                       return;
                     }
 
-                    // Check if a friendship already exists
-                    const { data: existing } = await supabase
-                      .from("friendships")
-                      .select("id, status")
-                      .or(`and(user_id.eq.${user?.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user?.id})`)
-                      .maybeSingle();
+                     // Check if a friendship already exists
+                     const { data: existing } = await withTimeout(supabase
+                       .from("friendships")
+                       .select("id, status")
+                       .or(`and(user_id.eq.${user?.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user?.id})`)
+                       .maybeSingle());
 
-                    if (!existing) {
-                      // Create a pending friend request from current user to inviter
-                      const { error: friendErr } = await supabase
-                        .from("friendships")
-                        .insert({ user_id: user?.id, friend_id: invite.inviter_id, status: "pending" });
+                     if (!existing) {
+                       // Create a pending friend request from current user to inviter
+                       const { error: friendErr } = await withTimeout(supabase
+                         .from("friendships")
+                         .insert({ user_id: user?.id, friend_id: invite.inviter_id, status: "pending" }));
 
                       if (friendErr && !friendErr.message?.includes("duplicate")) {
                         toast("Couldn't send friend request — try again");
@@ -758,11 +722,11 @@ export default function FriendsPage() {
                       }
                     }
 
-                    // Mark code as used (with race condition protection via unique constraint)
-                    const { error: updateErr } = await supabase
-                      .from("invite_codes")
-                      .update({ used_by: user?.id, used_at: new Date().toISOString() })
-                      .eq("code", inviteCodeInput);
+                     // Mark code as used (with race condition protection via unique constraint)
+                     const { error: updateErr } = await withTimeout(supabase
+                       .from("invite_codes")
+                       .update({ used_by: user?.id, used_at: new Date().toISOString() })
+                       .eq("code", inviteCodeInput));
 
                     if (updateErr) {
                       // Unique constraint violation means another user already claimed this code
@@ -775,16 +739,17 @@ export default function FriendsPage() {
                       return;
                     }
 
-                    if (existing) {
-                      toast(`You're already friends with @${invite.inviter_username}!`);
-                    } else {
-                      feedbackFriendAdded();
-                      toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
-                    }
-                    
-                    setInviteCodeInput("");
-                    setShowAddFriendsModal(false);
-                    loadData();
+                     if (existing) {
+                       toast(`You're already friends with @${invite.inviter_username}!`);
+                     } else {
+                       feedbackFriendAdded();
+                       toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
+                     }
+                     
+                     setInviteCodeInput("");
+                     setShowAddFriendsModal(false);
+                     // Small delay before reloading to let the DB write propagate
+                     setTimeout(() => loadData(), 500);
                   } catch (err) {
                     console.error("[CallMe] redeem error:", err);
                     toast("Couldn't redeem code — try again");
@@ -850,17 +815,17 @@ If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-
                       });
 
                     // Now that share was successful, insert into database
-                    const { error } = await supabase
+                    const { error } = await withTimeout(supabase
                       .from("invite_codes")
                       .insert({
                         code: code,
                         inviter_id: user.id,
                         inviter_username: user.username,
-                      });
+                      }));
 
                     if (error) {
                       console.error("[CallMe] failed to save code:", error);
-                      toast("Code shared but failed to save — may need to reshare");
+                      toast("Code shared but failed to save — check your connection");
                       return;
                     }
 
