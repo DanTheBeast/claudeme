@@ -32,14 +32,14 @@ function resizeImage(file: File, maxPx: number, quality: number): Promise<Blob> 
      const url = URL.createObjectURL(file);
      let done = false; // guard against double cleanup
 
-     // Guard against HEIC/HEIF decode hangs — iOS WKWebView can stall decoding
-     // large camera photos, so we give it 30s before giving up.
-     const decodeTimeout = setTimeout(() => {
-       if (done) return;
-       done = true;
-       URL.revokeObjectURL(url);
-       reject(new Error("Image decode timed out"));
-     }, 30000);
+      // Guard against HEIC/HEIF decode hangs — iOS WKWebView can stall decoding
+      // large camera photos, so we give it 45s before giving up (some devices need this long).
+      const decodeTimeout = setTimeout(() => {
+        if (done) return;
+        done = true;
+        URL.revokeObjectURL(url);
+        reject(new Error("Image decode timed out"));
+      }, 45000);
 
      const cleanup = () => {
        if (done) return;
@@ -195,12 +195,12 @@ export default function ProfilePage() {
       const compressed = await resizeImage(file, 400, 0.85);
       const path = `${user.id}/avatar.jpg`;
 
-      // Wrap the upload in a 45s timeout so a hung request never freezes the app.
-      // Camera photos on iOS can take extra time to decode (HEIC→JPEG conversion
-      // happens in the browser before resizeImage even starts), so 15s was too tight.
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Upload timed out")), 45000)
-      );
+       // Wrap the upload in a 60s timeout so a hung request never freezes the app.
+       // Camera photos on iOS can take extra time to decode (HEIC→JPEG conversion
+       // happens in the browser before resizeImage even starts), and slow networks need time too.
+       const timeout = new Promise<never>((_, reject) =>
+         setTimeout(() => reject(new Error("Upload timed out")), 60000)
+       );
       const upload = supabase.storage
         .from("avatars")
         .upload(path, compressed, { upsert: true, contentType: "image/jpeg" });
