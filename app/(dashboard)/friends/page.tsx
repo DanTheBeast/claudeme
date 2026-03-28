@@ -328,11 +328,19 @@ export default function FriendsPage() {
     try {
       console.log("[CallMe] redeemInviteCode called:", { code: codeOrUsername, fromDeepLink });
       
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log("[CallMe] got session:", { hasToken: !!session?.access_token });
+      // Refresh session to ensure token is valid (especially important on mobile)
+      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr || !refreshed?.session?.access_token) {
+        console.error("[CallMe] session refresh failed:", refreshErr?.message);
+        toast("Session expired — please log in again");
+        return;
+      }
+      
+      const session = refreshed.session;
+      console.log("[CallMe] session refreshed:", { hasToken: !!session?.access_token, expiresIn: session?.expires_in });
       
       if (!session?.access_token) {
-        console.error("[CallMe] no access token available");
+        console.error("[CallMe] no access token after refresh");
         toast("Authentication error — please try logging in again");
         return;
       }

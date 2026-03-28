@@ -29,14 +29,30 @@ Deno.serve(async (req) => {
 
   // Authenticate the caller
   const authHeader = req.headers.get("Authorization") ?? "";
-  const { data: { user }, error: authErr } = await supabase.auth.getUser(
-    authHeader.replace("Bearer ", "")
-  );
+  const token = authHeader.replace("Bearer ", "");
+  
+  console.log("[redeem-invite-code] Auth header present:", !!authHeader);
+  console.log("[redeem-invite-code] Token length:", token.length);
+  console.log("[redeem-invite-code] Token prefix:", token.substring(0, 30));
+  
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+  
+  if (authErr) {
+    console.error("[redeem-invite-code] Auth error:", {
+      message: authErr.message,
+      code: authErr.code,
+      status: authErr.status,
+    });
+  }
+  
   if (authErr || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    console.error("[redeem-invite-code] Authentication failed");
+    return new Response(JSON.stringify({ error: "Unauthorized", detail: authErr?.message }), {
       status: 401, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
+  
+  console.log("[redeem-invite-code] User authenticated:", user.id);
 
   const body = await req.json().catch(() => ({}));
   const code = (body.code as string ?? "").trim().toLowerCase();
