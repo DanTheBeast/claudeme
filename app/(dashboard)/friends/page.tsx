@@ -665,98 +665,20 @@ export default function FriendsPage() {
                 />
               
               {/* Redeem button */}
-              <button
-                disabled={inviteCodeInput.length < 4 || redeemingCode}
-                onClick={async () => {
-                  // Validate code format before database query
-                  if (!isValidCodeFormat(inviteCodeInput)) {
-                    toast("Invalid code format — should be 8 characters");
-                    return;
-                  }
+               <button
+                 disabled={inviteCodeInput.length < 4 || redeemingCode}
+                 onClick={async () => {
+                   // Validate code format before calling Edge Function
+                   if (!isValidCodeFormat(inviteCodeInput)) {
+                     toast("Invalid code format — should be 8 characters");
+                     return;
+                   }
 
-                   setRedeemingCode(true);
-                   try {
-                     const { data: invite, error: lookupErr } = await withTimeout(supabase
-                       .from("invite_codes")
-                       .select("code, inviter_id, inviter_username, used_by")
-                       .eq("code", inviteCodeInput)
-                       .maybeSingle());
-
-                     if (lookupErr || !invite) {
-                       toast("Code not found — check spelling and try again");
-                       setRedeemingCode(false);
-                       return;
-                     }
-
-                    // Can't redeem your own code
-                    if (invite.inviter_id === user?.id) {
-                      toast("That's your own invite code!");
-                      setRedeemingCode(false);
-                      return;
-                    }
-
-                    // If already used by someone else, reject
-                    if (invite.used_by && invite.used_by !== user?.id) {
-                      toast("This code has already been used");
-                      setRedeemingCode(false);
-                      return;
-                    }
-
-                     // Check if a friendship already exists
-                     const { data: existing } = await withTimeout(supabase
-                       .from("friendships")
-                       .select("id, status")
-                       .or(`and(user_id.eq.${user?.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user?.id})`)
-                       .maybeSingle());
-
-                     if (!existing) {
-                       // Create a pending friend request from current user to inviter
-                       const { error: friendErr } = await withTimeout(supabase
-                         .from("friendships")
-                         .insert({ user_id: user?.id, friend_id: invite.inviter_id, status: "pending" }));
-
-                      if (friendErr && !friendErr.message?.includes("duplicate")) {
-                        toast("Couldn't send friend request — try again");
-                        setRedeemingCode(false);
-                        return;
-                      }
-                    }
-
-                     // Mark code as used (with race condition protection via unique constraint)
-                     const { error: updateErr } = await withTimeout(supabase
-                       .from("invite_codes")
-                       .update({ used_by: user?.id, used_at: new Date().toISOString() })
-                       .eq("code", inviteCodeInput));
-
-                    if (updateErr) {
-                      // Unique constraint violation means another user already claimed this code
-                      if (updateErr.message?.includes("unique constraint")) {
-                        toast("Someone just claimed this code — try another one!");
-                      } else {
-                        toast("Failed to claim code — try again");
-                      }
-                      setRedeemingCode(false);
-                      return;
-                    }
-
-                     if (existing) {
-                       toast(`You're already friends with @${invite.inviter_username}!`);
-                     } else {
-                       feedbackFriendAdded();
-                       toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
-                     }
-                     
-                     setInviteCodeInput("");
-                     setShowAddFriendsModal(false);
-                     // Small delay before reloading to let the DB write propagate
-                     setTimeout(() => loadData(), 500);
-                  } catch (err) {
-                    console.error("[CallMe] redeem error:", err);
-                    toast("Couldn't redeem code — try again");
-                  } finally {
-                    setRedeemingCode(false);
-                  }
-                }}
+                   // Use the same Edge Function as deep links for consistency and reliability
+                   await redeemInviteCode(inviteCodeInput);
+                   setInviteCodeInput("");
+                   setShowAddFriendsModal(false);
+                 }}
                 className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-lg hover:shadow-callme/25 transition-all"
                >
                  {redeemingCode
