@@ -564,10 +564,10 @@ export default function FriendsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => acceptRequest(req.id)} className="callme-gradient text-white w-11 h-11 rounded-full flex items-center justify-center">
+                    <button onClick={() => acceptRequest(req.id)} aria-label={`Accept friend request from ${req.requester?.display_name || 'User'}`} className="callme-gradient text-white w-11 h-11 rounded-full flex items-center justify-center">
                       <Check className="w-4 h-4" />
                     </button>
-                    <button onClick={() => declineRequest(req.id)} className="bg-gray-100 text-gray-500 w-11 h-11 rounded-full flex items-center justify-center hover:bg-gray-200">
+                    <button onClick={() => declineRequest(req.id)} aria-label={`Decline friend request from ${req.requester?.display_name || 'User'}`} className="bg-gray-100 text-gray-500 w-11 h-11 rounded-full flex items-center justify-center hover:bg-gray-200">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -598,6 +598,7 @@ export default function FriendsPage() {
                   </div>
                   <button
                     onClick={() => cancelRequest(req.id)}
+                    aria-label={`Cancel friend request to ${req.recipient?.display_name || 'User'}`}
                     className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-[10px] hover:bg-gray-50 hover:text-red-500 hover:border-red-200 transition-colors"
                   >
                     Cancel

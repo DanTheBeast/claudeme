@@ -71,28 +71,30 @@ export function BottomSheet({
 
   if (!open) return null;
 
-  return (
-    <div
-      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}
-      className="bg-black/35 backdrop-blur-[6px] flex items-end justify-center"
-      onClick={() => { feedbackClick(); onClose(); }}
-    >
-      <div
-        ref={sheetRef}
-        className="bg-white rounded-t-[28px] overflow-y-auto overflow-x-hidden anim-slide-up px-6 pt-2"
-        style={{
-          maxHeight: "88vh",
-          paddingBottom: "calc(2rem + env(safe-area-inset-bottom))",
-          width: "100%",
-          maxWidth: "100vw",
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        {/* Drag handle */}
-        <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mt-2 mb-5" />
+   return (
+     <div
+       style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}
+       className="bg-black/35 backdrop-blur-[6px] flex items-end justify-center"
+       onClick={() => { feedbackClick(); onClose(); }}
+       role="dialog"
+       aria-modal="true"
+     >
+       <div
+         ref={sheetRef}
+         className="bg-white rounded-t-[28px] overflow-y-auto overflow-x-hidden anim-slide-up px-6 pt-2"
+         style={{
+           maxHeight: "88vh",
+           paddingBottom: "calc(2rem + env(safe-area-inset-bottom))",
+           width: "100%",
+           maxWidth: "100vw",
+         }}
+         onClick={(e) => e.stopPropagation()}
+         onTouchStart={onTouchStart}
+         onTouchMove={onTouchMove}
+         onTouchEnd={onTouchEnd}
+       >
+         {/* Drag handle - accessible keyboard dismissal hint */}
+         <div className="w-9 h-1 rounded-full bg-gray-200 mx-auto mt-2 mb-5" aria-label="Drag to dismiss or press escape" />
         {children}
       </div>
     </div>

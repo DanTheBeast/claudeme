@@ -315,16 +315,17 @@ export default function AuthPage() {
                           Password
                         </label>
                         {mode === "signin" && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForgotMode(true);
-                              setMessage(null);
-                            }}
-                            className="text-[12px] text-callme hover:underline"
-                          >
-                            Forgot password?
-                          </button>
+                         <button
+                             type="button"
+                             onClick={() => {
+                               setForgotMode(true);
+                               setMessage(null);
+                             }}
+                             className="text-[12px] text-callme hover:underline"
+                             aria-label="Reset password"
+                           >
+                             Forgot password?
+                           </button>
                         )}
                       </div>
                       <div className="relative">
@@ -338,13 +339,14 @@ export default function AuthPage() {
                           autoComplete={mode === "signup" ? "new-password" : "current-password"}
                           className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme transition-all bg-gray-50/50 focus:bg-white pr-10"
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                         <button
+                           type="button"
+                           onClick={() => setShowPassword(!showPassword)}
+                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                           aria-label={showPassword ? "Hide password" : "Show password"}
+                         >
+                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                         </button>
                       </div>
                     </div>
                   )}
@@ -361,11 +363,12 @@ export default function AuthPage() {
                     </div>
                   )}
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all disabled:opacity-60"
-                  >
+                   <button
+                     type="submit"
+                     disabled={loading}
+                     className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all disabled:opacity-60"
+                     aria-label={loading ? "Please wait..." : forgotMode ? "Send password reset link" : mode === "signin" ? "Sign in to CallMe" : "Create CallMe account"}
+                   >
                     {loading ? (
                       "Please wait..."
                     ) : forgotMode ? (
@@ -377,40 +380,42 @@ export default function AuthPage() {
                     )}
                   </button>
 
-                  {forgotMode && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForgotMode(false);
-                        setMessage(null);
-                      }}
-                      className="w-full text-center text-gray-400 text-sm hover:text-gray-600 transition-colors pt-1"
-                    >
-                      ← Back to sign in
-                    </button>
-                  )}
+                   {forgotMode && (
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setForgotMode(false);
+                         setMessage(null);
+                       }}
+                       className="w-full text-center text-gray-400 text-sm hover:text-gray-600 transition-colors pt-1"
+                       aria-label="Back to sign in"
+                     >
+                       ← Back to sign in
+                     </button>
+                   )}
                 </form>
               </div>
 
-              {!forgotMode && (
-                <button
-                  onClick={() => {
-                    if (isReturning) {
-                      localStorage.removeItem(LAST_EMAIL_KEY);
-                      setEmail("");
-                      setStep(0);
-                      setMode("signup");
-                    } else {
-                      setStep(1);
-                    }
-                  }}
-                  className="block mx-auto mt-4 text-gray-400 text-sm hover:text-gray-600 transition-colors"
-                >
-                  {isReturning
-                    ? `Not ${savedEmail.split("@")[0]}? Sign in with a different account`
-                    : "← Back"}
-                </button>
-              )}
+               {!forgotMode && (
+                 <button
+                   onClick={() => {
+                     if (isReturning) {
+                       localStorage.removeItem(LAST_EMAIL_KEY);
+                       setEmail("");
+                       setStep(0);
+                       setMode("signup");
+                     } else {
+                       setStep(1);
+                     }
+                   }}
+                   className="block mx-auto mt-4 text-gray-400 text-sm hover:text-gray-600 transition-colors"
+                   aria-label={isReturning ? "Sign in with different account" : "Back"}
+                 >
+                   {isReturning
+                     ? `Not ${savedEmail.split("@")[0]}? Sign in with a different account`
+                     : "← Back"}
+                 </button>
+               )}
             </div>
           )}
         </div>

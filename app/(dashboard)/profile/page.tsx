@@ -400,17 +400,18 @@ export default function ProfilePage() {
                   ? user.profile_picture + (avatarBust ? `?t=${avatarBust}` : "")
                   : null}
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingPhoto}
-                className="absolute bottom-0 right-0 w-10 h-10 bg-callme rounded-full flex items-center justify-center shadow-md border-2 border-white"
-              >
-                {uploadingPhoto ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Camera className="w-4 h-4 text-white" />
-                )}
-              </button>
+               <button
+                 onClick={() => fileInputRef.current?.click()}
+                 disabled={uploadingPhoto}
+                 className="absolute bottom-0 right-0 w-10 h-10 bg-callme rounded-full flex items-center justify-center shadow-md border-2 border-white"
+                 aria-label={uploadingPhoto ? "Uploading photo" : "Change profile photo"}
+               >
+                 {uploadingPhoto ? (
+                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                 ) : (
+                   <Camera className="w-4 h-4 text-white" />
+                 )}
+               </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -525,18 +526,21 @@ export default function ProfilePage() {
                   <p className="text-sm font-medium">{s.title}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{s.desc}</p>
                 </div>
-                <button
-                  onClick={() => updateSetting(s.key, !isOn)}
-                  className={`w-11 h-6 rounded-full relative transition-colors flex-shrink-0 ${
-                    isOn ? "bg-callme" : "bg-gray-300"
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${
-                      isOn ? "left-[22px]" : "left-0.5"
-                    }`}
-                  />
-                </button>
+               <button
+                   onClick={() => updateSetting(s.key, !isOn)}
+                   className={`w-11 h-6 rounded-full relative transition-colors flex-shrink-0 ${
+                     isOn ? "bg-callme" : "bg-gray-300"
+                   }`}
+                   role="switch"
+                   aria-checked={isOn}
+                   aria-label={`${s.title}: ${isOn ? 'On' : 'Off'}`}
+                 >
+                   <div
+                     className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${
+                       isOn ? "left-[22px]" : "left-0.5"
+                     }`}
+                   />
+                 </button>
               </div>
             );
           })}
@@ -549,23 +553,26 @@ export default function ProfilePage() {
                 <p className="text-xs text-gray-400 mt-0.5">UI sound effects</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                const next = !appSounds;
-                setSoundsEnabled(next);
-                setAppSounds(next);
-                if (next) feedbackToggleOn(); else feedbackToggleOff();
-              }}
-              className={`w-11 h-6 rounded-full relative transition-colors flex-shrink-0 ${
-                appSounds ? "bg-callme" : "bg-gray-300"
-              }`}
-            >
-              <div
-                className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${
-                  appSounds ? "left-[22px]" : "left-0.5"
-                }`}
-              />
-            </button>
+             <button
+               onClick={() => {
+                 const next = !appSounds;
+                 setSoundsEnabled(next);
+                 setAppSounds(next);
+                 if (next) feedbackToggleOn(); else feedbackToggleOff();
+               }}
+               className={`w-11 h-6 rounded-full relative transition-colors flex-shrink-0 ${
+                 appSounds ? "bg-callme" : "bg-gray-300"
+               }`}
+               role="switch"
+               aria-checked={appSounds}
+               aria-label={`App sounds: ${appSounds ? 'On' : 'Off'}`}
+             >
+               <div
+                 className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${
+                   appSounds ? "left-[22px]" : "left-0.5"
+                 }`}
+               />
+             </button>
           </div>
         </div>
 
@@ -598,28 +605,31 @@ export default function ProfilePage() {
         {/* Sign Out — two-step to prevent accidental taps */}
          {confirmLogout ? (
            <div className="flex gap-2">
-             <button
-               onClick={() => setConfirmLogout(false)}
-               disabled={loggingOut}
-               className="flex-1 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-             >
-               Cancel
-             </button>
-             <button
-               onClick={handleLogout}
-               disabled={loggingOut}
-               className="flex-1 px-5 py-3.5 bg-red-500 border-[1.5px] border-red-500 rounded-[16px] text-white font-semibold text-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-             >
-               <LogOut className="w-[18px] h-[18px]" /> {loggingOut ? "Signing out..." : "Yes, sign out"}
-             </button>
+              <button
+                onClick={() => setConfirmLogout(false)}
+                disabled={loggingOut}
+                className="flex-1 px-5 py-3.5 bg-white border-[1.5px] border-gray-200 rounded-[16px] text-gray-500 font-medium text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Cancel logout"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="flex-1 px-5 py-3.5 bg-red-500 border-[1.5px] border-red-500 rounded-[16px] text-white font-semibold text-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                aria-label={loggingOut ? "Signing out" : "Confirm sign out"}
+              >
+                <LogOut className="w-[18px] h-[18px]" /> {loggingOut ? "Signing out..." : "Yes, sign out"}
+              </button>
            </div>
         ) : (
-          <button
-            onClick={() => setConfirmLogout(true)}
-            className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-red-200 rounded-[16px] text-red-500 font-medium text-sm hover:bg-red-50 transition-colors"
-          >
-            <LogOut className="w-[18px] h-[18px]" /> Sign Out
-          </button>
+           <button
+             onClick={() => setConfirmLogout(true)}
+             className="w-full flex items-center gap-3 px-5 py-3.5 bg-white border-[1.5px] border-red-200 rounded-[16px] text-red-500 font-medium text-sm hover:bg-red-50 transition-colors"
+             aria-label="Sign out from CallMe"
+           >
+             <LogOut className="w-[18px] h-[18px]" /> Sign Out
+           </button>
         )}
 
         {/* Delete Account — two-step, visually separate from Sign Out */}
@@ -630,33 +640,36 @@ export default function ProfilePage() {
               This permanently deletes your profile, friends, and all data. This cannot be undone.
             </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => setConfirmDelete(false)}
-                disabled={deleting}
-                className="flex-1 px-4 py-2.5 bg-gray-100 rounded-[12px] text-gray-600 font-medium text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleting}
-                className="flex-1 px-4 py-2.5 bg-red-500 rounded-[12px] text-white font-semibold text-sm flex items-center justify-center gap-1.5"
-              >
-                {deleting ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  "Yes, delete everything"
-                )}
-              </button>
+               <button
+                 onClick={() => setConfirmDelete(false)}
+                 disabled={deleting}
+                 className="flex-1 px-4 py-2.5 bg-gray-100 rounded-[12px] text-gray-600 font-medium text-sm"
+                 aria-label="Cancel account deletion"
+               >
+                 Cancel
+               </button>
+               <button
+                 onClick={handleDeleteAccount}
+                 disabled={deleting}
+                 className="flex-1 px-4 py-2.5 bg-red-500 rounded-[12px] text-white font-semibold text-sm flex items-center justify-center gap-1.5"
+                 aria-label={deleting ? "Deleting account" : "Confirm account deletion"}
+               >
+                 {deleting ? (
+                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                 ) : (
+                   "Yes, delete everything"
+                 )}
+               </button>
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            className="w-full text-center text-xs text-gray-400 hover:text-red-400 transition-colors py-2"
-          >
-            Delete Account
-          </button>
+           <button
+             onClick={() => setConfirmDelete(true)}
+             className="w-full text-center text-xs text-gray-400 hover:text-red-400 transition-colors py-2"
+             aria-label="Delete account"
+           >
+             Delete Account
+           </button>
         )}
 
         {/* App info */}

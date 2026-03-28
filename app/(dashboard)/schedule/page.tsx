@@ -332,30 +332,32 @@ export default function SchedulePage() {
             <h1 className="font-display text-xl font-bold">Schedule</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFriends(!showFriends)}
-              className={`px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 transition-all ${
-                showFriends
-                  ? "bg-blue-50 text-blue-600 border border-blue-200"
-                  : "bg-gray-50 text-gray-400 border border-gray-200"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              Friends
-            </button>
-            <button
-              onClick={() =>
-                setAddModal({
-                  day: today,
-                  start: "09:00",
-                  end: "10:00",
-                  desc: "",
-                })
-              }
-              className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
-            >
-              <Plus className="w-4 h-4" /> Add
-            </button>
+           <button
+               onClick={() => setShowFriends(!showFriends)}
+               className={`px-3 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 transition-all ${
+                 showFriends
+                   ? "bg-blue-50 text-blue-600 border border-blue-200"
+                   : "bg-gray-50 text-gray-400 border border-gray-200"
+               }`}
+               aria-label={`${showFriends ? 'Hide' : 'Show'} friends' availability`}
+             >
+               <Users className="w-4 h-4" />
+               Friends
+             </button>
+             <button
+               onClick={() =>
+                 setAddModal({
+                   day: today,
+                   start: "09:00",
+                   end: "10:00",
+                   desc: "",
+                 })
+               }
+               className="callme-gradient text-white px-4 py-2 rounded-[12px] text-[13px] font-semibold flex items-center gap-1.5 hover:shadow-md hover:shadow-callme/25 transition-all"
+               aria-label="Add availability window for today"
+             >
+               <Plus className="w-4 h-4" /> Add
+             </button>
           </div>
         </div>
       </header>
@@ -397,19 +399,21 @@ export default function SchedulePage() {
               <p className="text-[13px] text-blue-700 leading-relaxed mt-1.5">
                 This is separate from going available in real time — think of it as your standing availability, not a live status.
               </p>
-              <button
-                onClick={dismissExplainer}
-                className="mt-2.5 text-[12px] font-semibold text-blue-500 hover:text-blue-700 transition-colors"
-              >
-                Got it
-              </button>
+               <button
+                 onClick={dismissExplainer}
+                 className="mt-2.5 text-[12px] font-semibold text-blue-500 hover:text-blue-700 transition-colors"
+                 aria-label="Close information banner"
+               >
+                 Got it
+               </button>
             </div>
-            <button
-              onClick={dismissExplainer}
-              className="text-blue-400 hover:text-blue-600 flex-shrink-0 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+             <button
+               onClick={dismissExplainer}
+               className="text-blue-400 hover:text-blue-600 flex-shrink-0 transition-colors"
+               aria-label="Dismiss explainer banner"
+             >
+               <X className="w-4 h-4" />
+             </button>
           </div>
         )}
 
@@ -428,12 +432,13 @@ export default function SchedulePage() {
                 <p className="text-gray-400 text-sm leading-relaxed mb-4 max-w-[260px] mx-auto">
                   Add your weekly free windows so CallMe can find the best times to connect.
                 </p>
-                <button
-                  onClick={() => setAddModal({ day: today, start: "09:00", end: "10:00", desc: "" })}
-                  className="callme-gradient text-white px-5 py-2.5 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
-                >
-                  <Plus className="w-4 h-4" /> Add your first window
-                </button>
+                 <button
+                   onClick={() => setAddModal({ day: today, start: "09:00", end: "10:00", desc: "" })}
+                   className="callme-gradient text-white px-5 py-2.5 rounded-[14px] text-sm font-semibold inline-flex items-center gap-2 hover:shadow-lg hover:shadow-callme/25 transition-all"
+                   aria-label="Add your first availability window"
+                 >
+                   <Plus className="w-4 h-4" /> Add your first window
+                 </button>
               </div>
             )}
             {/* Show days starting from today, wrapping around the week */}
@@ -479,19 +484,20 @@ export default function SchedulePage() {
                       </span>
                     )}
                   </div>
-                  <button
-                    onClick={() =>
-                      setAddModal({
-                        day: dayIdx,
-                        start: "09:00",
-                        end: "10:00",
-                        desc: "",
-                      })
-                    }
-                    className="text-xs text-gray-400 hover:text-callme font-medium transition-colors"
-                  >
-                    + Add
-                  </button>
+                   <button
+                     onClick={() =>
+                       setAddModal({
+                         day: dayIdx,
+                         start: "09:00",
+                         end: "10:00",
+                         desc: "",
+                       })
+                     }
+                     className="text-xs text-gray-400 hover:text-callme font-medium transition-colors"
+                     aria-label={`Add availability window for ${DAYS[dayIdx]}`}
+                   >
+                     + Add
+                   </button>
                 </div>
 
                 {/* User's own windows */}
@@ -517,18 +523,20 @@ export default function SchedulePage() {
                         </div>
                         {confirmRemoveId === w.id ? (
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setConfirmRemoveId(null)}
-                              className="text-xs text-gray-400 px-2 py-1 rounded-[8px] hover:bg-gray-100 transition-colors"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={() => { setConfirmRemoveId(null); removeWindow(w.id); }}
-                              className="text-xs text-white bg-red-500 px-2.5 py-1 rounded-[8px] font-semibold hover:bg-red-600 transition-colors"
-                            >
-                              Remove
-                            </button>
+                             <button
+                               onClick={() => setConfirmRemoveId(null)}
+                               className="text-xs text-gray-400 px-2 py-1 rounded-[8px] hover:bg-gray-100 transition-colors"
+                               aria-label="Cancel removing window"
+                             >
+                               Cancel
+                             </button>
+                             <button
+                               onClick={() => { setConfirmRemoveId(null); removeWindow(w.id); }}
+                               className="text-xs text-white bg-red-500 px-2.5 py-1 rounded-[8px] font-semibold hover:bg-red-600 transition-colors"
+                               aria-label="Confirm removing window"
+                             >
+                               Remove
+                             </button>
                           </div>
                         ) : (
                           <button
@@ -609,14 +617,15 @@ export default function SchedulePage() {
                                 </span>
                               </div>
                             </div>
-                            {isOverlap && fw.friend?.phone_number && (
-                              <a
-                                href={`tel:${fw.friend.phone_number}`}
-                                className="callme-gradient text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 hover:shadow-md hover:shadow-callme/25 transition-all"
-                              >
-                                <Phone className="w-3.5 h-3.5" />
-                              </a>
-                            )}
+                             {isOverlap && fw.friend?.phone_number && (
+                               <a
+                                 href={`tel:${fw.friend.phone_number}`}
+                                 className="callme-gradient text-white w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 hover:shadow-md hover:shadow-callme/25 transition-all"
+                                 aria-label={`Call ${fw.friend?.display_name || 'friend'}`}
+                               >
+                                 <Phone className="w-3.5 h-3.5" />
+                               </a>
+                             )}
                           </div>
                         );
                       })}
@@ -711,28 +720,30 @@ export default function SchedulePage() {
               </p>
             </div>
 
-            <div className="flex gap-3 justify-end mt-2">
-              <button
-                onClick={() => setAddModal(null)}
-                className="px-5 py-2.5 text-sm border border-gray-200 rounded-[14px] text-gray-500 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (addModal.start >= addModal.end) {
-                    setTimeError("End time must be after start time (windows must be within the same day)");
-                    feedbackError();
-                    return;
-                  }
-                  setTimeError(null);
-                  addWindow(addModal);
-                }}
-                className="callme-gradient text-white px-5 py-2.5 rounded-[14px] text-sm font-semibold hover:shadow-md hover:shadow-callme/25 transition-all"
-              >
-                Add Availability
-              </button>
-            </div>
+             <div className="flex gap-3 justify-end mt-2">
+               <button
+                 onClick={() => setAddModal(null)}
+                 className="px-5 py-2.5 text-sm border border-gray-200 rounded-[14px] text-gray-500 hover:bg-gray-50 transition-colors"
+                 aria-label="Close add availability modal"
+               >
+                 Cancel
+               </button>
+               <button
+                 onClick={() => {
+                   if (addModal.start >= addModal.end) {
+                     setTimeError("End time must be after start time (windows must be within the same day)");
+                     feedbackError();
+                     return;
+                   }
+                   setTimeError(null);
+                   addWindow(addModal);
+                 }}
+                 className="callme-gradient text-white px-5 py-2.5 rounded-[14px] text-sm font-semibold hover:shadow-md hover:shadow-callme/25 transition-all"
+                 aria-label="Save new availability window"
+               >
+                 Add Availability
+               </button>
+             </div>
           </div>
         )}
       </BottomSheet>
