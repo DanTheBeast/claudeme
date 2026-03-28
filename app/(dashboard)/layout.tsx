@@ -509,37 +509,93 @@ export default function DashboardLayout({
             />
             <button
               disabled={inviteCodeInput.length < 4 || redeemingCode}
-              onClick={async () => {
-                setRedeemingCode(true);
-                try {
-                  const { data: { session } } = await supabase.auth.getSession();
-                  const res = await fetch(
-                    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`,
-                    {
-                      method: "POST",
-                      headers: {
-                        "Authorization": `Bearer ${session?.access_token}`,
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({ code: inviteCodeInput }),
-                    }
-                  );
-                  const json = await res.json();
-                  if (!res.ok) {
-                    toast(json.error || "Invalid code — double-check and try again");
-                    return;
-                  }
-                  toast(json.already_friends
-                    ? `You're already friends with @${json.inviter_username}!`
-                    : `Friend request sent to @${json.inviter_username}! 🎉`
-                  );
-                  setShowInviteCodePrompt(false);
-                } catch {
-                  toast("Something went wrong — try again");
-                } finally {
-                  setRedeemingCode(false);
-                }
-              }}
+               onClick={async () => {
+                 setRedeemingCode(true);
+                 try {
+                   const code = inviteCodeInput.trim().toLowerCase();
+
+                   // Step 1: Look up the invite code
+                   const { data: invite, error: lookupErr } = await supabase
+                     .from("invite_codes")
+                     .select("code, inviter_id, inviter_username, used_by")
+                     .eq("code", code)
+                     .maybeSingle();
+                   
+                   if (lookupErr) {
+                     toast("Failed to lookup code — try again");
+                     return;
+                   }
+                   
+                   if (!invite) {
+                     toast("Code not found — double-check and try again");
+                     return;
+                   }
+
+                   // Can't redeem your own code
+                   if (invite.inviter_id === user?.id) {
+                     toast("That's your own invite code!");
+                     return;
+                   }
+                   
+                   // If already used by someone else, reject
+                   if (invite.used_by && invite.used_by !== user?.id) {
+                     toast("This code has already been used");
+                     return;
+                   }
+
+                   // Step 2: Check if friendship already exists
+                   const { data: existing, error: friendshipCheckErr } = await supabase
+                     .from("friendships")
+                     .select("id, status")
+                     .or(`and(user_id.eq.${user?.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user?.id})`)
+                     .maybeSingle();
+                   
+                   if (friendshipCheckErr) {
+                     toast("Failed to check friendship — try again");
+                     return;
+                   }
+
+                   // Step 3: Create friendship if it doesn't exist
+                   if (!existing && user?.id) {
+                     const { error: createErr } = await supabase
+                       .from("friendships")
+                       .insert({
+                         user_id: user.id,
+                         friend_id: invite.inviter_id,
+                         status: "pending",
+                       });
+                     
+                     if (createErr) {
+                       // If it's a duplicate key error, that's OK (idempotent)
+                       if (!createErr.message?.includes("duplicate")) {
+                         toast("Failed to send friend request — try again");
+                         return;
+                       }
+                     }
+                   }
+
+                   // Step 4: Mark code as used
+                   if (user?.id) {
+                     await supabase
+                       .from("invite_codes")
+                       .update({ used_by: user.id, used_at: new Date().toISOString() })
+                       .eq("code", code);
+                   }
+
+                   // Success!
+                   if (existing?.status === "accepted") {
+                     toast(`You're already friends with @${invite.inviter_username}!`);
+                   } else {
+                     toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
+                   }
+                   setShowInviteCodePrompt(false);
+                 } catch (err) {
+                   console.error("[CallMe] invite code error:", err);
+                   toast("Something went wrong — try again");
+                 } finally {
+                   setRedeemingCode(false);
+                 }
+               }}
               className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 mb-3 hover:shadow-lg hover:shadow-callme/25 transition-all"
             >
               {redeemingCode
