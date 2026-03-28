@@ -345,22 +345,27 @@ export default function FriendsPage() {
         return;
       }
       
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`;
-      console.log("[CallMe] calling Edge Function at:", url);
+      // Use Supabase client's functions.invoke() method which handles auth properly
+      console.log("[CallMe] calling Edge Function: redeem-invite-code");
       
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ code: codeOrUsername }),
-      });
+      const { data: json, error: functionErr } = await supabase.functions.invoke(
+        "redeem-invite-code",
+        {
+          body: { code: codeOrUsername },
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
       
-      console.log("[CallMe] Edge Function response status:", res.status);
+      console.log("[CallMe] Edge Function response:", { data: json, error: functionErr });
       
-      const json = await res.json();
-      console.log("[CallMe] Edge Function response:", json);
+      // Convert to fetch-like response for consistency with error handling below
+      const isOk = !functionErr;
+      const res = {
+        ok: isOk,
+        status: functionErr ? (functionErr as any).status || 500 : 200,
+      };
       
       if (!res.ok) {
         toast(json.error || "Something went wrong — try again");

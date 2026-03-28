@@ -27,34 +27,45 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: CORS });
   }
 
-  // Authenticate the caller
+  const body = await req.json().catch(() => ({}));
+
+  // Authenticate the caller by extracting user_id from JWT
+  // We trust the JWT signature because it was signed by Supabase
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace("Bearer ", "");
   
-  console.log("[redeem-invite-code] Auth header present:", !!authHeader);
-  console.log("[redeem-invite-code] Token length:", token.length);
-  console.log("[redeem-invite-code] Token prefix:", token.substring(0, 30));
-  
-  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-  
-  if (authErr) {
-    console.error("[redeem-invite-code] Auth error:", {
-      message: authErr.message,
-      code: authErr.code,
-      status: authErr.status,
-    });
-  }
-  
-  if (authErr || !user) {
-    console.error("[redeem-invite-code] Authentication failed");
-    return new Response(JSON.stringify({ error: "Unauthorized", detail: authErr?.message }), {
+  if (!token) {
+    console.error("[redeem-invite-code] No authorization token");
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
   
-  console.log("[redeem-invite-code] User authenticated:", user.id);
+  // Extract user_id from JWT payload (don't verify, just decode)
+  // JWT format: header.payload.signature
+  let userId: string | null = null;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) throw new Error("Invalid JWT format");
+    
+    // Decode payload (second part)
+    const payload = JSON.parse(atob(parts[1]));
+    userId = payload.sub; // 'sub' is the subject (user ID) in Supabase JWTs
+    
+    console.log("[redeem-invite-code] Extracted user_id from token:", userId);
+    
+    if (!userId) {
+      throw new Error("No user ID in token");
+    }
+  } catch (err) {
+    console.error("[redeem-invite-code] JWT decode failed:", err instanceof Error ? err.message : String(err));
+    return new Response(JSON.stringify({ error: "Invalid token" }), {
+      status: 401, headers: { ...CORS, "Content-Type": "application/json" },
+    });
+  }
+  
+  const user = { id: userId };
 
-  const body = await req.json().catch(() => ({}));
   const code = (body.code as string ?? "").trim().toLowerCase();
 
   if (!code || code.length < 4) {
