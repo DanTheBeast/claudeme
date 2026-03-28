@@ -8,17 +8,16 @@ import { feedbackToggleOn, feedbackToggleOff, feedbackSuccess, feedbackClick, fe
 import { FriendCard } from "@/app/_components/friend-card";
 import { BottomSheet } from "@/app/_components/bottom-sheet";
 import {
-   Phone,
-   PhoneOff,
-   Lightbulb,
-   Save,
-   Clock,
-   ChevronDown,
-   Timer,
-   Infinity,
-   ArrowRight,
-   Share2,
- } from "lucide-react";
+    Phone,
+    PhoneOff,
+    Lightbulb,
+    Save,
+    Clock,
+    ChevronDown,
+    Timer,
+    ArrowRight,
+    Share2,
+  } from "lucide-react";
 import { Share } from "@capacitor/share";
 import Link from "next/link";
 import type { FriendWithProfile, Profile } from "@/app/_lib/types";
@@ -28,7 +27,6 @@ const DURATIONS = [
   { label: "30 min",  minutes: 30 },
   { label: "1 hour",  minutes: 60 },
   { label: "2 hours", minutes: 120 },
-  { label: "Until I turn it off", minutes: null },
 ];
 
 function formatCountdown(until: string): string {
@@ -701,17 +699,8 @@ If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-
                 <span className="font-semibold text-sm group-hover:text-emerald-700 transition-colors">
                   {d.label}
                 </span>
-                {d.minutes === null && (
-                  <p className="text-[11px] text-gray-400 mt-0.5">
-                    You'll need to turn this off manually
-                  </p>
-                )}
               </div>
-              {d.minutes === null ? (
-                <Infinity className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
-              ) : (
-                <Timer className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
-              )}
+              <Timer className="w-4 h-4 text-gray-300 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
             </button>
           ))}
         </div>
