@@ -29,14 +29,31 @@ Deno.serve(async (req) => {
 
   // Authenticate the caller
   const authHeader = req.headers.get("Authorization") ?? "";
-  const { data: { user }, error: authErr } = await supabase.auth.getUser(
-    authHeader.replace("Bearer ", "")
-  );
+  const token = authHeader.replace("Bearer ", "");
+  
+  console.log("[redeem-invite-code] Auth attempt:", {
+    hasAuthHeader: !!authHeader,
+    tokenLength: token.length,
+  });
+  
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+  
+  if (authErr) {
+    console.error("[redeem-invite-code] Auth error:", {
+      message: authErr.message,
+      code: authErr.code,
+      status: authErr.status,
+    });
+  }
+  
   if (authErr || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+    console.error("[redeem-invite-code] Authentication failed", { authErr, user });
+    return new Response(JSON.stringify({ error: "Unauthorized", detail: authErr?.message }), {
       status: 401, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
+  
+  console.log("[redeem-invite-code] User authenticated:", user.id);
 
   const body = await req.json().catch(() => ({}));
   const code = (body.code as string ?? "").trim().toLowerCase();
@@ -48,24 +65,43 @@ Deno.serve(async (req) => {
   }
 
   // Look up the code
+  console.log("[redeem-invite-code] Looking up code:", code);
+  
   const { data: invite, error: lookupErr } = await supabase
     .from("invite_codes")
     .select("code, inviter_id, inviter_username, used_by")
     .eq("code", code)
     .maybeSingle();
 
+  console.log("[redeem-invite-code] Code lookup result:", {
+    found: !!invite,
+    error: lookupErr?.message,
+    errorCode: lookupErr?.code,
+  });
+
   if (lookupErr) {
-    console.error("[redeem-invite-code] code lookup failed:", lookupErr);
-    return new Response(JSON.stringify({ error: "Code lookup failed — try again" }), {
+    console.error("[redeem-invite-code] code lookup failed:", {
+      message: lookupErr.message,
+      code: lookupErr.code,
+      details: (lookupErr as any).details,
+      hint: (lookupErr as any).hint,
+    });
+    return new Response(JSON.stringify({ 
+      error: "Code lookup failed — try again",
+      detail: lookupErr.message,
+    }), {
       status: 500, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
 
   if (!invite) {
+    console.log("[redeem-invite-code] Code not found:", code);
     return new Response(JSON.stringify({ error: "Code not found — double-check and try again" }), {
       status: 404, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
+  
+  console.log("[redeem-invite-code] Code validated, inviter:", invite.inviter_id);
 
   // Can't redeem your own code
   if (invite.inviter_id === user.id) {
