@@ -97,9 +97,20 @@ Deno.serve(async (req) => {
 
   if (!existing) {
     // Create a pending friend request from the redeemer to the inviter
-    const { error: friendErr } = await supabase
+    console.log("[redeem-invite-code] attempting friendship insert:", {
+      user_id: user.id,
+      friend_id: invite.inviter_id,
+      status: "pending",
+    });
+    
+    const { data: insertData, error: friendErr } = await supabase
       .from("friendships")
       .insert({ user_id: user.id, friend_id: invite.inviter_id, status: "pending" });
+
+    console.log("[redeem-invite-code] friendship insert result:", {
+      data: insertData,
+      error: friendErr,
+    });
 
     if (friendErr && !friendErr.message?.includes("duplicate")) {
       console.error("[redeem-invite-code] friendship insert failed:", {
@@ -107,8 +118,9 @@ Deno.serve(async (req) => {
         user_id: user.id,
         inviter_id: invite.inviter_id,
         error: friendErr.message,
-        code: friendErr.code,
+        errorCode: friendErr.code,
         details: friendErr.details,
+        hint: friendErr.hint,
       });
       return new Response(JSON.stringify({ error: "Failed to send friend request — try again" }), {
         status: 500, headers: { ...CORS, "Content-Type": "application/json" },
