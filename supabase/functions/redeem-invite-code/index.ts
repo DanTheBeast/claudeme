@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
   }
 
   // Look up the code
+  console.log("[redeem-invite-code] Looking up code:", code);
   const { data: invite, error: lookupErr } = await supabase
     .from("invite_codes")
     .select("code, inviter_id, inviter_username, used_by")
@@ -62,10 +63,13 @@ Deno.serve(async (req) => {
   }
 
   if (!invite) {
+    console.log("[redeem-invite-code] Code not found in database:", code);
     return new Response(JSON.stringify({ error: "Code not found — double-check and try again" }), {
       status: 404, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
+
+  console.log("[redeem-invite-code] Code found:", { code, inviter_id: invite.inviter_id, used_by: invite.used_by });
 
   // Can't redeem your own code
   if (invite.inviter_id === user.id) {
@@ -82,6 +86,11 @@ Deno.serve(async (req) => {
   }
 
   // Check if a friendship already exists in either direction — don't duplicate
+  console.log("[redeem-invite-code] checking for existing friendship:", {
+    user_id: user.id,
+    inviter_id: invite.inviter_id,
+  });
+  
   const { data: existing, error: existingErr } = await supabase
     .from("friendships")
     .select("id, status")
@@ -89,11 +98,16 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (existingErr) {
-    console.error("[redeem-invite-code] friendship check failed:", existingErr);
+    console.error("[redeem-invite-code] friendship check failed:", {
+      error: existingErr.message,
+      code: existingErr.code,
+    });
     return new Response(JSON.stringify({ error: "Failed to check friendship — try again" }), {
       status: 500, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
+  
+  console.log("[redeem-invite-code] friendship check result:", { exists: !!existing, status: existing?.status });
 
   if (!existing) {
     // Create a pending friend request from the redeemer to the inviter
@@ -109,15 +123,16 @@ Deno.serve(async (req) => {
 
     console.log("[redeem-invite-code] friendship insert result:", {
       data: insertData,
-      error: friendErr,
+      error: friendErr?.message,
+      errorCode: friendErr?.code,
     });
 
     if (friendErr && !friendErr.message?.includes("duplicate")) {
-      console.error("[redeem-invite-code] friendship insert failed:", {
+      console.error("[redeem-invite-code] friendship insert FAILED:", {
         code,
         user_id: user.id,
         inviter_id: invite.inviter_id,
-        error: friendErr.message,
+        errorMessage: friendErr.message,
         errorCode: friendErr.code,
         details: friendErr.details,
         hint: friendErr.hint,
