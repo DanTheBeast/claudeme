@@ -318,9 +318,13 @@ export default function FriendsPage() {
   // Called when the app is opened via a callme://invite?code=... deep link,
   // or when a user enters a code manually. Routes through the redeem-invite-code
   // Edge Function which validates the code and creates the friend request.
-  const redeemInviteCode = async (codeOrUsername: string) => {
+  const redeemInviteCode = async (codeOrUsername: string, fromDeepLink = true) => {
     if (!user) return;
-    setSendingInviteRequest(true);
+    
+    // Use different state setters depending on where the call comes from
+    const setLoading = fromDeepLink ? setSendingInviteRequest : setRedeemingCode;
+    setLoading(true);
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
@@ -353,7 +357,7 @@ export default function FriendsPage() {
       // Network error — keep banner so user can retry
       toast("Something went wrong — check your connection and try again");
     } finally {
-      setSendingInviteRequest(false);
+      setLoading(false);
     }
   };
 
@@ -675,7 +679,7 @@ export default function FriendsPage() {
                    }
 
                    // Use the same Edge Function as deep links for consistency and reliability
-                   await redeemInviteCode(inviteCodeInput);
+                   await redeemInviteCode(inviteCodeInput, false);
                    setInviteCodeInput("");
                    setShowAddFriendsModal(false);
                  }}
