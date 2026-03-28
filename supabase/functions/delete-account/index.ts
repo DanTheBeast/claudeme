@@ -42,22 +42,69 @@ Deno.serve(async (req) => {
 
     const userId = user.id;
 
-    // Delete all user data in order
-    await supabaseAdmin.from("push_tokens").delete().eq("user_id", userId);
-    await supabaseAdmin.from("availability_windows").delete().eq("user_id", userId);
-    await supabaseAdmin.from("friendships").delete().or(`user_id.eq.${userId},friend_id.eq.${userId}`);
-    await supabaseAdmin.from("profiles").delete().eq("id", userId);
+    // Delete all user data in order — each must succeed before proceeding
+    console.log("[delete-account] Starting account deletion for user:", userId);
+
+    const { error: pushTokenErr } = await supabaseAdmin.from("push_tokens").delete().eq("user_id", userId);
+    if (pushTokenErr) {
+      console.error("[delete-account] Failed to delete push tokens:", pushTokenErr);
+      return new Response(JSON.stringify({ error: "Failed to delete push tokens" }), { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const { error: windowErr } = await supabaseAdmin.from("availability_windows").delete().eq("user_id", userId);
+    if (windowErr) {
+      console.error("[delete-account] Failed to delete availability windows:", windowErr);
+      return new Response(JSON.stringify({ error: "Failed to delete availability windows" }), { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const { error: friendshipErr } = await supabaseAdmin.from("friendships").delete().or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+    if (friendshipErr) {
+      console.error("[delete-account] Failed to delete friendships:", friendshipErr);
+      return new Response(JSON.stringify({ error: "Failed to delete friendships" }), { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const { error: profileErr } = await supabaseAdmin.from("profiles").delete().eq("id", userId);
+    if (profileErr) {
+      console.error("[delete-account] Failed to delete profile:", profileErr);
+      return new Response(JSON.stringify({ error: "Failed to delete profile" }), { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
 
     // Delete the auth user — this is irreversible
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
     if (deleteError) {
-      console.error("Failed to delete auth user:", deleteError.message);
-      return new Response("Failed to delete account", { status: 500 });
+      console.error("[delete-account] Failed to delete auth user:", {
+        userId,
+        message: deleteError.message,
+        status: deleteError.status,
+      });
+      return new Response(JSON.stringify({ error: "Failed to delete auth user" }), { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    return new Response("ok", { status: 200 });
+    console.log("[delete-account] Account deleted successfully for user:", userId);
+    return new Response(JSON.stringify({ success: true }), { 
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
   } catch (e) {
-    console.error(e);
-    return new Response("error", { status: 500 });
+    console.error("[delete-account] Unexpected error:", e instanceof Error ? e.message : String(e));
+    return new Response(JSON.stringify({ error: "Internal server error" }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 });

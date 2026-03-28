@@ -139,49 +139,82 @@ Deno.serve(async () => {
 
   const sends: Promise<void>[] = [];
 
-  for (const { user_id, friend_id } of friendships) {
-    for (const [recipient, sender] of [[user_id, friend_id], [friend_id, user_id]]) {
-      const profile = profileMap[recipient];
-      if (!profile?.enable_push_notifications || !profile?.notify_call_suggestions) continue;
-      if (!tokenMap[recipient]?.length) continue;
+  try {
+    for (const { user_id, friend_id } of friendships) {
+      for (const [recipient, sender] of [[user_id, friend_id], [friend_id, user_id]]) {
+        const profile = profileMap[recipient];
+        if (!profile?.enable_push_notifications || !profile?.notify_call_suggestions) continue;
+        if (!tokenMap[recipient]?.length) continue;
 
-      const senderProfile = profileMap[sender];
-      const senderName = senderProfile?.display_name ?? "Your friend";
-      const startTime = windowStartFor(recipient);
+        const senderProfile = profileMap[sender];
+        const senderName = senderProfile?.display_name ?? "Your friend";
+        const startTime = windowStartFor(recipient);
 
-      // Check if already notified for this slot today
-      const { data: existing } = await supabase
-        .from("notified_schedule_matches")
-        .select("id")
-        .eq("user_id", recipient)
-        .eq("friend_id", sender)
-        .eq("window_date", todayDate)
-        .eq("start_time", startTime)
-        .maybeSingle();
+        // Check if already notified for this slot today
+        const { data: existing, error: checkErr } = await supabase
+          .from("notified_schedule_matches")
+          .select("id")
+          .eq("user_id", recipient)
+          .eq("friend_id", sender)
+          .eq("window_date", todayDate)
+          .eq("start_time", startTime)
+          .maybeSingle();
 
-      if (existing) continue;
+        if (checkErr) {
+          console.error("[notify-schedule-matches] failed to check notification status:", {
+            user_id: recipient,
+            friend_id: sender,
+            error: checkErr.message,
+          });
+          continue;
+        }
 
-      // Mark as notified
-      await supabase.from("notified_schedule_matches").insert({
-        user_id: recipient,
-        friend_id: sender,
-        window_date: todayDate,
-        start_time: startTime,
-      });
+        if (existing) continue;
 
-      for (const token of tokenMap[recipient]) {
-        sends.push(
-          sendApns(
-            token,
-            `${senderName} is free to chat! 📞`,
-            "You both have time right now — give them a call!",
-            "/schedule/"
-          )
-        );
+        // Mark as notified
+        const { error: insertErr } = await supabase.from("notified_schedule_matches").insert({
+          user_id: recipient,
+          friend_id: sender,
+          window_date: todayDate,
+          start_time: startTime,
+        });
+
+        if (insertErr) {
+          console.error("[notify-schedule-matches] failed to mark as notified:", {
+            user_id: recipient,
+            friend_id: sender,
+            error: insertErr.message,
+          });
+          continue;
+        }
+
+        for (const token of tokenMap[recipient]) {
+          sends.push(
+            sendApns(
+              token,
+              `${senderName} is free to chat! 📞`,
+              "You both have time right now — give them a call!",
+              "/schedule/"
+            )
+          );
+        }
       }
     }
-  }
 
-  await Promise.allSettled(sends);
-  return new Response(`sent ${sends.length} notifications`, { status: 200 });
+    const results = await Promise.allSettled(sends);
+    const failed = results.filter(r => r.status === 'rejected').length;
+    if (failed > 0) {
+      console.warn(`[notify-schedule-matches] ${failed} of ${sends.length} push notifications failed`);
+    }
+    return new Response(JSON.stringify({ sent: sends.length, failed }), { 
+      headers: { "Content-Type": "application/json" },
+      status: 200 
+    });
+  } catch (err) {
+    console.error("[notify-schedule-matches] unexpected error:", err instanceof Error ? err.message : String(err));
+    return new Response(JSON.stringify({ error: "Internal server error" }), { 
+      headers: { "Content-Type": "application/json" },
+      status: 500 
+    });
+  }
 });

@@ -557,7 +557,7 @@ export default function FriendsPage() {
               {pendingRequests.map((req) => (
                 <div key={req.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-[14px]">
                   <div className="flex items-center gap-3">
-                    <Avatar name={req.requester?.display_name || "User"} id={req.user_id} />
+                    <Avatar name={req.requester?.display_name || "User"} id={req.user_id} src={req.requester?.profile_picture} />
                     <div>
                       <p className="font-medium text-sm">{req.requester?.display_name || "Unknown"}</p>
                       <p className="text-xs text-gray-400">@{req.requester?.username || "user"}</p>
@@ -590,7 +590,7 @@ export default function FriendsPage() {
               {outgoingRequests.map((req) => (
                 <div key={req.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-[14px]">
                   <div className="flex items-center gap-3">
-                    <Avatar name={req.recipient?.display_name || "User"} id={req.friend_id} />
+                    <Avatar name={req.recipient?.display_name || "User"} id={req.friend_id} src={req.recipient?.profile_picture} />
                     <div>
                       <p className="font-medium text-sm">{req.recipient?.display_name || "Unknown"}</p>
                       <p className="text-xs text-gray-400">@{req.recipient?.username || "user"}</p>
