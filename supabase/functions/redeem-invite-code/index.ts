@@ -27,45 +27,18 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: CORS });
   }
 
-  const body = await req.json().catch(() => ({}));
-
-  // Authenticate the caller by extracting user_id from JWT
-  // We trust the JWT signature because it was signed by Supabase
+  // Authenticate the caller
   const authHeader = req.headers.get("Authorization") ?? "";
-  const token = authHeader.replace("Bearer ", "");
-  
-  if (!token) {
-    console.error("[redeem-invite-code] No authorization token");
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(
+    authHeader.replace("Bearer ", "")
+  );
+  if (authErr || !user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
-  
-  // Extract user_id from JWT payload (don't verify, just decode)
-  // JWT format: header.payload.signature
-  let userId: string | null = null;
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) throw new Error("Invalid JWT format");
-    
-    // Decode payload (second part)
-    const payload = JSON.parse(atob(parts[1]));
-    userId = payload.sub; // 'sub' is the subject (user ID) in Supabase JWTs
-    
-    console.log("[redeem-invite-code] Extracted user_id from token:", userId);
-    
-    if (!userId) {
-      throw new Error("No user ID in token");
-    }
-  } catch (err) {
-    console.error("[redeem-invite-code] JWT decode failed:", err instanceof Error ? err.message : String(err));
-    return new Response(JSON.stringify({ error: "Invalid token" }), {
-      status: 401, headers: { ...CORS, "Content-Type": "application/json" },
-    });
-  }
-  
-  const user = { id: userId };
 
+  const body = await req.json().catch(() => ({}));
   const code = (body.code as string ?? "").trim().toLowerCase();
 
   if (!code || code.length < 4) {
@@ -75,7 +48,6 @@ Deno.serve(async (req) => {
   }
 
   // Look up the code
-  console.log("[redeem-invite-code] Looking up code:", code);
   const { data: invite, error: lookupErr } = await supabase
     .from("invite_codes")
     .select("code, inviter_id, inviter_username, used_by")
@@ -90,13 +62,10 @@ Deno.serve(async (req) => {
   }
 
   if (!invite) {
-    console.log("[redeem-invite-code] Code not found in database:", code);
     return new Response(JSON.stringify({ error: "Code not found — double-check and try again" }), {
       status: 404, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
-
-  console.log("[redeem-invite-code] Code found:", { code, inviter_id: invite.inviter_id, used_by: invite.used_by });
 
   // Can't redeem your own code
   if (invite.inviter_id === user.id) {
@@ -113,11 +82,6 @@ Deno.serve(async (req) => {
   }
 
   // Check if a friendship already exists in either direction — don't duplicate
-  console.log("[redeem-invite-code] checking for existing friendship:", {
-    user_id: user.id,
-    inviter_id: invite.inviter_id,
-  });
-  
   const { data: existing, error: existingErr } = await supabase
     .from("friendships")
     .select("id, status")
@@ -125,16 +89,11 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (existingErr) {
-    console.error("[redeem-invite-code] friendship check failed:", {
-      error: existingErr.message,
-      code: existingErr.code,
-    });
+    console.error("[redeem-invite-code] friendship check failed:", existingErr);
     return new Response(JSON.stringify({ error: "Failed to check friendship — try again" }), {
       status: 500, headers: { ...CORS, "Content-Type": "application/json" },
     });
   }
-  
-  console.log("[redeem-invite-code] friendship check result:", { exists: !!existing, status: existing?.status });
 
   if (!existing) {
     // Create a pending friend request from the redeemer to the inviter
@@ -150,16 +109,15 @@ Deno.serve(async (req) => {
 
     console.log("[redeem-invite-code] friendship insert result:", {
       data: insertData,
-      error: friendErr?.message,
-      errorCode: friendErr?.code,
+      error: friendErr,
     });
 
     if (friendErr && !friendErr.message?.includes("duplicate")) {
-      console.error("[redeem-invite-code] friendship insert FAILED:", {
+      console.error("[redeem-invite-code] friendship insert failed:", {
         code,
         user_id: user.id,
         inviter_id: invite.inviter_id,
-        errorMessage: friendErr.message,
+        error: friendErr.message,
         errorCode: friendErr.code,
         details: friendErr.details,
         hint: friendErr.hint,

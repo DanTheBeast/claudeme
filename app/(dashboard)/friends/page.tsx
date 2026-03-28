@@ -318,55 +318,23 @@ export default function FriendsPage() {
   // Called when the app is opened via a callme://invite?code=... deep link,
   // or when a user enters a code manually. Routes through the redeem-invite-code
   // Edge Function which validates the code and creates the friend request.
-  const redeemInviteCode = async (codeOrUsername: string, fromDeepLink = true) => {
+  const redeemInviteCode = async (codeOrUsername: string) => {
     if (!user) return;
-    
-    // Use different state setters depending on where the call comes from
-    const setLoading = fromDeepLink ? setSendingInviteRequest : setRedeemingCode;
-    setLoading(true);
-    
+    setSendingInviteRequest(true);
     try {
-      console.log("[CallMe] redeemInviteCode called:", { code: codeOrUsername, fromDeepLink });
-      
-      // Refresh session to ensure token is valid (especially important on mobile)
-      const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
-      if (refreshErr || !refreshed?.session?.access_token) {
-        console.error("[CallMe] session refresh failed:", refreshErr?.message);
-        toast("Session expired — please log in again");
-        return;
-      }
-      
-      const session = refreshed.session;
-      console.log("[CallMe] session refreshed:", { hasToken: !!session?.access_token, expiresIn: session?.expires_in });
-      
-      if (!session?.access_token) {
-        console.error("[CallMe] no access token after refresh");
-        toast("Authentication error — please try logging in again");
-        return;
-      }
-      
-      // Use Supabase client's functions.invoke() method which handles auth properly
-      console.log("[CallMe] calling Edge Function: redeem-invite-code");
-      
-      const { data: json, error: functionErr } = await supabase.functions.invoke(
-        "redeem-invite-code",
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`,
         {
-          body: { code: codeOrUsername },
+          method: "POST",
           headers: {
+            "Authorization": `Bearer ${session?.access_token}`,
             "Content-Type": "application/json",
           },
+          body: JSON.stringify({ code: codeOrUsername }),
         }
       );
-      
-      console.log("[CallMe] Edge Function response:", { data: json, error: functionErr });
-      
-      // Convert to fetch-like response for consistency with error handling below
-      const isOk = !functionErr;
-      const res = {
-        ok: isOk,
-        status: functionErr ? (functionErr as any).status || 500 : 200,
-      };
-      
+      const json = await res.json();
       if (!res.ok) {
         toast(json.error || "Something went wrong — try again");
         // Only clear banner for terminal errors (not retryable network issues)
@@ -381,12 +349,11 @@ export default function FriendsPage() {
       }
       clearPendingInvite();
       loadData();
-    } catch (err) {
-      console.error("[CallMe] redeem error:", err);
+    } catch {
       // Network error — keep banner so user can retry
       toast("Something went wrong — check your connection and try again");
     } finally {
-      setLoading(false);
+      setSendingInviteRequest(false);
     }
   };
 
@@ -707,8 +674,8 @@ export default function FriendsPage() {
                      return;
                    }
 
-                   // Use the same Edge Function as deep links for consistency and reliability
-                   await redeemInviteCode(inviteCodeInput, false);
+                    // Use the same Edge Function as deep links for consistency and reliability
+                    await redeemInviteCode(inviteCodeInput);
                    setInviteCodeInput("");
                    setShowAddFriendsModal(false);
                  }}
