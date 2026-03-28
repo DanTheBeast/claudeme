@@ -326,19 +326,34 @@ export default function FriendsPage() {
     setLoading(true);
     
     try {
+      console.log("[CallMe] redeemInviteCode called:", { code: codeOrUsername, fromDeepLink });
+      
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`,
-        {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${session?.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ code: codeOrUsername }),
-        }
-      );
+      console.log("[CallMe] got session:", { hasToken: !!session?.access_token });
+      
+      if (!session?.access_token) {
+        console.error("[CallMe] no access token available");
+        toast("Authentication error — please try logging in again");
+        return;
+      }
+      
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/redeem-invite-code`;
+      console.log("[CallMe] calling Edge Function at:", url);
+      
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code: codeOrUsername }),
+      });
+      
+      console.log("[CallMe] Edge Function response status:", res.status);
+      
       const json = await res.json();
+      console.log("[CallMe] Edge Function response:", json);
+      
       if (!res.ok) {
         toast(json.error || "Something went wrong — try again");
         // Only clear banner for terminal errors (not retryable network issues)
@@ -353,7 +368,8 @@ export default function FriendsPage() {
       }
       clearPendingInvite();
       loadData();
-    } catch {
+    } catch (err) {
+      console.error("[CallMe] redeem error:", err);
       // Network error — keep banner so user can retry
       toast("Something went wrong — check your connection and try again");
     } finally {
