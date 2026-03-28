@@ -70,10 +70,16 @@ const TIPS = [
 ];
 
 function LoadingScreen() {
-  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * TIPS.length));
+  // Initialize to 0, then set random value after hydration (useEffect)
+  // This prevents hydration mismatch in static export where server and client
+  // would get different Math.random() values if initialized in useState()
+  const [tipIndex, setTipIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    // Initialize to random tip on first mount (after hydration)
+    setTipIndex(Math.floor(Math.random() * TIPS.length));
+    
     let fadeTimer: ReturnType<typeof setTimeout> | null = null;
     const interval = setInterval(() => {
       // Fade out, swap tip, fade in
