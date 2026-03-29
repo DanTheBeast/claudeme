@@ -670,9 +670,9 @@ export default function SchedulePage() {
                   Start
                 </label>
                 <input
-                  type="time"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
-                  value={addModal.start}
+                   type="time"
+                   className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-base bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
+                   value={addModal.start}
                   onChange={(e) => {
                     setAddModal({ ...addModal, start: e.target.value });
                     setTimeError(null);
@@ -684,9 +684,9 @@ export default function SchedulePage() {
                   End
                 </label>
                 <input
-                  type="time"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
-                  value={addModal.end}
+                   type="time"
+                   className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-base bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
+                   value={addModal.end}
                   onChange={(e) => {
                     setAddModal({ ...addModal, end: e.target.value });
                     setTimeError(null);
@@ -701,9 +701,9 @@ export default function SchedulePage() {
               <label className="text-[13px] font-semibold mb-1.5 block">
                 Note (optional)
               </label>
-              <input
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-sm bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
-                value={addModal.desc}
+               <input
+                 className="w-full px-4 py-2.5 border border-gray-200 rounded-[14px] text-base bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20"
+                 value={addModal.desc}
                 onChange={(e) =>
                   setAddModal({ ...addModal, desc: e.target.value })
                 }

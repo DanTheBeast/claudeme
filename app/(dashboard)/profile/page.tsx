@@ -400,12 +400,12 @@ export default function ProfilePage() {
                   ? user.profile_picture + (avatarBust ? `?t=${avatarBust}` : "")
                   : null}
               />
-               <button
-                 onClick={() => fileInputRef.current?.click()}
-                 disabled={uploadingPhoto}
-                 className="absolute bottom-0 right-0 w-10 h-10 bg-callme rounded-full flex items-center justify-center shadow-md border-2 border-white"
-                 aria-label={uploadingPhoto ? "Uploading photo" : "Change profile photo"}
-               >
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="absolute bottom-0 right-0 w-11 h-11 bg-callme rounded-full flex items-center justify-center shadow-md border-2 border-white"
+                  aria-label={uploadingPhoto ? "Uploading photo" : "Change profile photo"}
+                >
                  {uploadingPhoto ? (
                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                  ) : (

@@ -740,7 +740,7 @@ export default function FriendsPage() {
                   placeholder="Paste or type the invite code"
                   autoCorrect="off"
                   autoCapitalize="none"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-sm font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-base font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
                 />
               
               {/* Redeem button */}
