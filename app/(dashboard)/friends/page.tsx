@@ -780,23 +780,23 @@ export default function FriendsPage() {
                 Share your code so others can add you:
               </p>
               
-              <button
-                disabled={sharingCode}
-                onClick={async () => {
-                  try {
-                    if (!user) {
-                      toast("Not authenticated");
-                      return;
-                    }
+               <button
+                 disabled={sharingCode}
+                 onClick={async () => {
+                   try {
+                     if (!user) {
+                       toast("Not authenticated");
+                       return;
+                     }
 
-                    // Rate limiting: prevent spamming code generation (max 1 code every 5 seconds)
-                    const now = Date.now();
-                    if (now - lastCodeGeneratedTime < 5000) {
-                      toast("Wait a moment before generating another code");
-                      return;
-                    }
-                    
-                    setSharingCode(true);
+                     // Rate limiting: prevent spamming code generation (max 1 code every 5 seconds)
+                     const now = Date.now();
+                     if (now - lastCodeGeneratedTime < 5000) {
+                       toast("Wait a moment before generating another code");
+                       return;
+                     }
+                     
+                     setSharingCode(true);
 
                      // Generate a random invite code locally
                      const chars = "23456789abcdefghjkmnpqrstuvwxyz";
@@ -805,91 +805,91 @@ export default function FriendsPage() {
                      const code = Array.from(bytes).map((b) => chars[b % chars.length]).join("");
 
                      console.log("[CallMe] Generated invite code:", code);
+                      
+                     // Validate user data before inserting
+                     if (!user.id || !user.username) {
+                       console.error("[CallMe] Missing user data:", { id: user.id, username: user.username });
+                       toast("Error: Your profile is incomplete. Please update your profile and try again.");
+                       return;
+                     }
+                     
+                     const insertPayload = {
+                       code: code,
+                       inviter_id: user.id,
+                       inviter_username: user.username,
+                     };
+                     console.log("[CallMe] Insert payload:", insertPayload);
+                     console.log("[CallMe] Current user session:", { userId: user.id, username: user.username });
 
-                     // Share the code FIRST (before saving to DB)
-                     // This way if user cancels, we don't waste a code
-                     const shareResult = await Share.share({
-                       title: "Join me on CallMe",
-                       text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy this entire message and paste it in the "Add Friends" section — it'll automatically extract the code:
+                     // CRITICAL CHANGE: Save to database FIRST (before showing share dialog)
+                     // This way the code is safe in the database immediately
+                     // and the app doesn't block on the Share.share() promise
+                     console.log("[CallMe] Saving code to database (before share)...");
+                     const { data, error } = await withTimeout(supabase
+                       .from("invite_codes")
+                       .insert(insertPayload)
+                       .select(), 10000);
+
+                     console.log("[CallMe] Insert response:", { data, error });
+                     console.log("[CallMe] Insert error details:", error ? { message: error.message, code: error.code, details: error.details, hint: error.hint } : null);
+                     
+                     if (error) {
+                       console.error("[CallMe] failed to save code - full error:", JSON.stringify(error, null, 2));
+                       // Check if it's an RLS policy error
+                       if (error.code === "PGRST301" || error.message?.includes("row-level security")) {
+                         toast("Permission denied - your session may have expired. Try signing out and back in.");
+                       } else if (error.message?.includes("duplicate")) {
+                         toast("This code was already used - generate a new one");
+                       } else {
+                         toast("Failed to generate code — check your connection");
+                       }
+                       return;
+                     }
+
+                     console.log("[CallMe] Code saved successfully!", data);
+                     // Update rate limit timestamp
+                     setLastCodeGeneratedTime(now);
+
+                     // NOW show the share dialog (code is already safe in DB)
+                     console.log("[CallMe] Showing share dialog...");
+                     try {
+                       await Share.share({
+                         title: "Join me on CallMe",
+                         text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy this entire message and paste it in the "Add Friends" section — it'll automatically extract the code:
 
 ${code}
 
 If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                     });
-
-                     console.log("[CallMe] Share result:", shareResult);
-
-                     // Verify user actually completed the share (not cancelled)
-                     // On iOS, Share.share() returns a result object if successful
-                     // If cancelled, it may throw an error or return undefined
-                     if (!shareResult) {
-                       console.log("[CallMe] User cancelled share or share failed");
-                       toast("Share cancelled — code not saved");
-                       return;
+                       });
+                       console.log("[CallMe] Share completed successfully");
+                     } catch (shareErr) {
+                       // If share dialog fails or is cancelled, code is still in DB which is fine
+                       console.log("[CallMe] Share dialog cancelled or failed:", shareErr);
                      }
 
-                      // Now that share was successful, insert into database
-                      console.log("[CallMe] Saving code to database...");
-                      
-                      // Validate user data before inserting
-                      if (!user.id || !user.username) {
-                        console.error("[CallMe] Missing user data:", { id: user.id, username: user.username });
-                        toast("Error: Your profile is incomplete. Please update your profile and try again.");
-                        return;
-                      }
-                      
-                      const insertPayload = {
-                        code: code,
-                        inviter_id: user.id,
-                        inviter_username: user.username,
-                      };
-                      console.log("[CallMe] Insert payload:", insertPayload);
-                      console.log("[CallMe] Current user session:", { userId: user.id, username: user.username });
-                      
-                      const { data, error } = await withTimeout(supabase
-                        .from("invite_codes")
-                        .insert(insertPayload)
-                        .select(), 30000);
+                     // Close modal since everything succeeded
+                     setShowAddFriendsModal(false);
 
-                      console.log("[CallMe] Insert response:", { data, error });
-                      console.log("[CallMe] Insert error details:", error ? { message: error.message, code: error.code, details: error.details, hint: error.hint } : null);
-                      
-                      if (error) {
-                        console.error("[CallMe] failed to save code - full error:", JSON.stringify(error, null, 2));
-                        // Check if it's an RLS policy error
-                        if (error.code === "PGRST301" || error.message?.includes("row-level security")) {
-                          toast("Permission denied - your session may have expired. Try signing out and back in.");
-                        } else if (error.message?.includes("duplicate")) {
-                          toast("This code was already used - generate a new one");
-                        } else {
-                          toast("Code shared but failed to save — check your connection");
-                        }
-                        return;
-                      }
-
-                      console.log("[CallMe] Code saved successfully!", data);
-                      // Update rate limit timestamp
-                      setLastCodeGeneratedTime(now);
                    } catch (err: unknown) {
                      if (err instanceof Error && err.name !== "AbortError") {
-                       console.error("[CallMe] share/save failed:", err.message);
+                       console.error("[CallMe] code generation failed:", err.message);
                        if (err.message.includes("timed out")) {
-                         toast("Code shared but took too long to save — try again");
+                         toast("Request timed out — check your connection and try again");
                        } else {
-                         toast("Code shared but failed to save — check your connection");
+                         toast("Something went wrong — check your connection and try again");
                        }
                      }
                    } finally {
                      setSharingCode(false);
                    }
-                }}
-                className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-lg hover:shadow-callme/25 transition-all"
-              >
-                {sharingCode
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sharing…</>
-                  : <><Share2 className="w-4 h-4" /> Share Your Code</>
-                }
-              </button>
+                 }}
+                 className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-lg hover:shadow-callme/25 transition-all"
+               >
+                 {sharingCode
+                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generating code…</>
+                   : <><Share2 className="w-4 h-4" /> Share Your Code</>
+                 }
+               </button>
             </div>
 
             <button
