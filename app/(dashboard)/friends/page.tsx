@@ -787,40 +787,55 @@ export default function FriendsPage() {
                     
                     setSharingCode(true);
 
-                    // Generate a random invite code locally
-                    const chars = "23456789abcdefghjkmnpqrstuvwxyz";
-                    const bytes = new Uint8Array(8);
-                    crypto.getRandomValues(bytes);
-                    const code = Array.from(bytes).map((b) => chars[b % chars.length]).join("");
+                     // Generate a random invite code locally
+                     const chars = "23456789abcdefghjkmnpqrstuvwxyz";
+                     const bytes = new Uint8Array(8);
+                     crypto.getRandomValues(bytes);
+                     const code = Array.from(bytes).map((b) => chars[b % chars.length]).join("");
 
-                    // Share the code FIRST (before saving to DB)
-                    // This way if user cancels, we don't waste a code
-                      await Share.share({
-                        title: "Join me on CallMe",
-                        text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy this entire message and paste it in the "Add Friends" section — it'll automatically extract the code:
+                     console.log("[CallMe] Generated invite code:", code);
+
+                     // Share the code FIRST (before saving to DB)
+                     // This way if user cancels, we don't waste a code
+                     const shareResult = await Share.share({
+                       title: "Join me on CallMe",
+                       text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy this entire message and paste it in the "Add Friends" section — it'll automatically extract the code:
 
 ${code}
 
 If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                      });
+                     });
 
-                    // Now that share was successful, insert into database
-                    const { error } = await withTimeout(supabase
-                      .from("invite_codes")
-                      .insert({
-                        code: code,
-                        inviter_id: user.id,
-                        inviter_username: user.username,
-                      }));
+                     console.log("[CallMe] Share result:", shareResult);
 
-                    if (error) {
-                      console.error("[CallMe] failed to save code:", error);
-                      toast("Code shared but failed to save — check your connection");
-                      return;
-                    }
+                     // Verify user actually completed the share (not cancelled)
+                     // On iOS, Share.share() returns a result object if successful
+                     // If cancelled, it may throw an error or return undefined
+                     if (!shareResult) {
+                       console.log("[CallMe] User cancelled share or share failed");
+                       toast("Share cancelled — code not saved");
+                       return;
+                     }
 
-                    // Update rate limit timestamp
-                    setLastCodeGeneratedTime(now);
+                     // Now that share was successful, insert into database
+                     console.log("[CallMe] Saving code to database...");
+                     const { error } = await withTimeout(supabase
+                       .from("invite_codes")
+                       .insert({
+                         code: code,
+                         inviter_id: user.id,
+                         inviter_username: user.username,
+                       }));
+
+                     if (error) {
+                       console.error("[CallMe] failed to save code:", error);
+                       toast("Code shared but failed to save — check your connection");
+                       return;
+                     }
+
+                     console.log("[CallMe] Code saved successfully!");
+                     // Update rate limit timestamp
+                     setLastCodeGeneratedTime(now);
                   } catch (err: unknown) {
                     if (err instanceof Error && err.name !== "AbortError") {
                       console.error("[CallMe] share failed:", err.message);
