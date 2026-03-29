@@ -828,39 +828,48 @@ If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-
                        return;
                      }
 
-                     // Now that share was successful, insert into database
-                     console.log("[CallMe] Saving code to database...");
-                     
-                     // Validate user data before inserting
-                     if (!user.id || !user.username) {
-                       console.error("[CallMe] Missing user data:", { id: user.id, username: user.username });
-                       toast("Error: Your profile is incomplete. Please update your profile and try again.");
-                       return;
-                     }
-                     
-                     const insertPayload = {
-                       code: code,
-                       inviter_id: user.id,
-                       inviter_username: user.username,
-                     };
-                     console.log("[CallMe] Insert payload:", insertPayload);
-                     
-                     const { data, error } = await withTimeout(supabase
-                       .from("invite_codes")
-                       .insert(insertPayload)
-                       .select(), 30000);
+                      // Now that share was successful, insert into database
+                      console.log("[CallMe] Saving code to database...");
+                      
+                      // Validate user data before inserting
+                      if (!user.id || !user.username) {
+                        console.error("[CallMe] Missing user data:", { id: user.id, username: user.username });
+                        toast("Error: Your profile is incomplete. Please update your profile and try again.");
+                        return;
+                      }
+                      
+                      const insertPayload = {
+                        code: code,
+                        inviter_id: user.id,
+                        inviter_username: user.username,
+                      };
+                      console.log("[CallMe] Insert payload:", insertPayload);
+                      console.log("[CallMe] Current user session:", { userId: user.id, username: user.username });
+                      
+                      const { data, error } = await withTimeout(supabase
+                        .from("invite_codes")
+                        .insert(insertPayload)
+                        .select(), 30000);
 
-                     console.log("[CallMe] Insert response:", { data, error });
-                     
-                     if (error) {
-                       console.error("[CallMe] failed to save code - full error:", JSON.stringify(error));
-                       toast("Code shared but failed to save — check your connection");
-                       return;
-                     }
+                      console.log("[CallMe] Insert response:", { data, error });
+                      console.log("[CallMe] Insert error details:", error ? { message: error.message, code: error.code, details: error.details, hint: error.hint } : null);
+                      
+                      if (error) {
+                        console.error("[CallMe] failed to save code - full error:", JSON.stringify(error, null, 2));
+                        // Check if it's an RLS policy error
+                        if (error.code === "PGRST301" || error.message?.includes("row-level security")) {
+                          toast("Permission denied - your session may have expired. Try signing out and back in.");
+                        } else if (error.message?.includes("duplicate")) {
+                          toast("This code was already used - generate a new one");
+                        } else {
+                          toast("Code shared but failed to save — check your connection");
+                        }
+                        return;
+                      }
 
-                     console.log("[CallMe] Code saved successfully!", data);
-                     // Update rate limit timestamp
-                     setLastCodeGeneratedTime(now);
+                      console.log("[CallMe] Code saved successfully!", data);
+                      // Update rate limit timestamp
+                      setLastCodeGeneratedTime(now);
                    } catch (err: unknown) {
                      if (err instanceof Error && err.name !== "AbortError") {
                        console.error("[CallMe] share/save failed:", err.message);
