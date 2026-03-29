@@ -819,30 +819,49 @@ If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-
 
                      // Now that share was successful, insert into database
                      console.log("[CallMe] Saving code to database...");
-                     const { error } = await withTimeout(supabase
+                     
+                     // Validate user data before inserting
+                     if (!user.id || !user.username) {
+                       console.error("[CallMe] Missing user data:", { id: user.id, username: user.username });
+                       toast("Error: Your profile is incomplete. Please update your profile and try again.");
+                       return;
+                     }
+                     
+                     const insertPayload = {
+                       code: code,
+                       inviter_id: user.id,
+                       inviter_username: user.username,
+                     };
+                     console.log("[CallMe] Insert payload:", insertPayload);
+                     
+                     const { data, error } = await withTimeout(supabase
                        .from("invite_codes")
-                       .insert({
-                         code: code,
-                         inviter_id: user.id,
-                         inviter_username: user.username,
-                       }));
+                       .insert(insertPayload)
+                       .select(), 30000);
 
+                     console.log("[CallMe] Insert response:", { data, error });
+                     
                      if (error) {
-                       console.error("[CallMe] failed to save code:", error);
+                       console.error("[CallMe] failed to save code - full error:", JSON.stringify(error));
                        toast("Code shared but failed to save — check your connection");
                        return;
                      }
 
-                     console.log("[CallMe] Code saved successfully!");
+                     console.log("[CallMe] Code saved successfully!", data);
                      // Update rate limit timestamp
                      setLastCodeGeneratedTime(now);
-                  } catch (err: unknown) {
-                    if (err instanceof Error && err.name !== "AbortError") {
-                      console.error("[CallMe] share failed:", err.message);
-                    }
-                  } finally {
-                    setSharingCode(false);
-                  }
+                   } catch (err: unknown) {
+                     if (err instanceof Error && err.name !== "AbortError") {
+                       console.error("[CallMe] share/save failed:", err.message);
+                       if (err.message.includes("timed out")) {
+                         toast("Code shared but took too long to save — try again");
+                       } else {
+                         toast("Code shared but failed to save — check your connection");
+                       }
+                     }
+                   } finally {
+                     setSharingCode(false);
+                   }
                 }}
                 className="w-full callme-gradient text-white py-3.5 rounded-[14px] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-lg hover:shadow-callme/25 transition-all"
               >
