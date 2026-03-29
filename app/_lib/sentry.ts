@@ -24,6 +24,16 @@ export function initSentry() {
     environment: process.env.NODE_ENV === "production" ? "production" : "development",
     // Don't send events in development so you don't pollute the dashboard.
     enabled: process.env.NODE_ENV === "production",
+    // Filter out known non-critical errors
+    beforeSend(event) {
+      // Ignore Supabase auth lock errors - these are library-level race conditions
+      // that don't affect the user experience (auth still completes successfully)
+      // Happens when: React Strict Mode, multiple simultaneous auth requests, or rapid navigation
+      if (event.exception?.values?.[0]?.value?.includes("Lock was stolen")) {
+        return null;
+      }
+      return event;
+    },
   });
 }
 
