@@ -318,111 +318,122 @@ export default function FriendsPage() {
   // Called when the app is opened via a callme://invite?code=... deep link,
   // or when a user enters a code manually. Routes through the redeem-invite-code
   // Edge Function which validates the code and creates the friend request.
-  const redeemInviteCode = async (codeOrUsername: string) => {
-    if (!user) return;
-    setSendingInviteRequest(true);
-    try {
-      console.log("[CallMe] redeemInviteCode called with code:", codeOrUsername);
-      const code = codeOrUsername.trim().toLowerCase();
-      
-      // Step 1: Look up the invite code
-      console.log("[CallMe] looking up invite code:", code);
-      const { data: invite, error: lookupErr } = await supabase
-        .from("invite_codes")
-        .select("code, inviter_id, inviter_username, used_by")
-        .eq("code", code)
-        .maybeSingle();
-      
-      if (lookupErr) {
-        console.error("[CallMe] invite code lookup failed:", lookupErr);
-        toast("Failed to lookup code — try again");
-        return;
-      }
-      
-      if (!invite) {
-        console.log("[CallMe] code not found:", code);
-        toast("Code not found — double-check and try again");
-        return;
-      }
-      
-      console.log("[CallMe] code found:", { code, inviter_id: invite.inviter_id });
-      
-      // Can't redeem your own code
-      if (invite.inviter_id === user.id) {
-        toast("That's your own invite code!");
-        return;
-      }
-      
-      // If already used by someone else, reject
-      if (invite.used_by && invite.used_by !== user.id) {
-        toast("This code has already been used");
-        return;
-      }
-      
-      // Step 2: Check if friendship already exists
-      console.log("[CallMe] checking for existing friendship");
-      const { data: existing, error: friendshipCheckErr } = await supabase
-        .from("friendships")
-        .select("id, status")
-        .or(`and(user_id.eq.${user.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user.id})`)
-        .maybeSingle();
-      
-      if (friendshipCheckErr) {
-        console.error("[CallMe] friendship check failed:", friendshipCheckErr);
-        toast("Failed to check friendship — try again");
-        return;
-      }
-      
-      // Step 3: Create friendship if it doesn't exist
-      if (!existing) {
-        console.log("[CallMe] creating friendship");
-        const { error: createErr } = await supabase
-          .from("friendships")
-          .insert({
-            user_id: user.id,
-            friend_id: invite.inviter_id,
-            status: "pending",
-          });
-        
-        if (createErr) {
-          console.error("[CallMe] friendship creation failed:", createErr);
-          // If it's a duplicate key error, that's OK (idempotent)
-          if (!createErr.message?.includes("duplicate")) {
-            toast("Failed to send friend request — try again");
-            return;
-          }
-        }
-      }
-      
-      // Step 4: Mark code as used
-      console.log("[CallMe] marking code as used");
-      const { error: updateErr } = await supabase
-        .from("invite_codes")
-        .update({ used_by: user.id, used_at: new Date().toISOString() })
-        .eq("code", code);
-      
-      if (updateErr) {
-        console.error("[CallMe] failed to mark code as used:", updateErr);
-        // Don't fail the whole thing if marking as used fails
-      }
-      
-      // Success!
-      console.log("[CallMe] redemption successful");
-      if (existing?.status === "accepted") {
-        toast(`You're already friends with @${invite.inviter_username}!`);
-      } else {
-        feedbackFriendAdded();
-        toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
-      }
-      clearPendingInvite();
-      loadData();
-    } catch (err) {
-      console.error("[CallMe] redeem error:", err);
-      toast("Something went wrong — check your connection and try again");
-    } finally {
-      setSendingInviteRequest(false);
-    }
-  };
+   const redeemInviteCode = async (codeOrUsername: string) => {
+     if (!user) return;
+     
+     // Guard against double-click by checking state first
+     if (redeemingCode || sendingInviteRequest) {
+       console.log("[CallMe] redeem already in progress, ignoring duplicate call");
+       return;
+     }
+     
+     setSendingInviteRequest(true);
+     try {
+       console.log("[CallMe] redeemInviteCode called with code:", codeOrUsername);
+       const code = codeOrUsername.trim().toLowerCase();
+       
+       // Step 1: Look up the invite code WITH TIMEOUT
+       console.log("[CallMe] looking up invite code:", code);
+       const { data: invite, error: lookupErr } = await withTimeout(supabase
+         .from("invite_codes")
+         .select("code, inviter_id, inviter_username, used_by")
+         .eq("code", code)
+         .maybeSingle(), 10000);
+       
+       if (lookupErr) {
+         console.error("[CallMe] invite code lookup failed:", lookupErr);
+         toast("Failed to lookup code — try again");
+         return;
+       }
+       
+       if (!invite) {
+         console.log("[CallMe] code not found:", code);
+         toast("Code not found — double-check and try again");
+         return;
+       }
+       
+       console.log("[CallMe] code found:", { code, inviter_id: invite.inviter_id });
+       
+       // Can't redeem your own code
+       if (invite.inviter_id === user.id) {
+         toast("That's your own invite code!");
+         return;
+       }
+       
+       // If already used by someone else, reject
+       if (invite.used_by && invite.used_by !== user.id) {
+         toast("This code has already been used");
+         return;
+       }
+       
+       // Step 2: Check if friendship already exists WITH TIMEOUT
+       console.log("[CallMe] checking for existing friendship");
+       const { data: existing, error: friendshipCheckErr } = await withTimeout(supabase
+         .from("friendships")
+         .select("id, status")
+         .or(`and(user_id.eq.${user.id},friend_id.eq.${invite.inviter_id}),and(user_id.eq.${invite.inviter_id},friend_id.eq.${user.id})`)
+         .maybeSingle(), 10000);
+       
+       if (friendshipCheckErr) {
+         console.error("[CallMe] friendship check failed:", friendshipCheckErr);
+         toast("Failed to check friendship — try again");
+         return;
+       }
+       
+       // Step 3: Create friendship if it doesn't exist WITH TIMEOUT
+       if (!existing) {
+         console.log("[CallMe] creating friendship");
+         const { error: createErr } = await withTimeout(supabase
+           .from("friendships")
+           .insert({
+             user_id: user.id,
+             friend_id: invite.inviter_id,
+             status: "pending",
+           }), 10000);
+         
+         if (createErr) {
+           console.error("[CallMe] friendship creation failed:", createErr);
+           // If it's a duplicate key error, that's OK (idempotent)
+           if (!createErr.message?.includes("duplicate")) {
+             toast("Failed to send friend request — try again");
+             return;
+           }
+         }
+       }
+       
+       // Step 4: Mark code as used WITH TIMEOUT
+       console.log("[CallMe] marking code as used");
+       const { error: updateErr } = await withTimeout(supabase
+         .from("invite_codes")
+         .update({ used_by: user.id, used_at: new Date().toISOString() })
+         .eq("code", code), 10000);
+       
+       if (updateErr) {
+         console.error("[CallMe] failed to mark code as used:", updateErr);
+         // Don't fail the whole thing if marking as used fails
+       }
+       
+       // Success!
+       console.log("[CallMe] redemption successful");
+       if (existing?.status === "accepted") {
+         toast(`You're already friends with @${invite.inviter_username}!`);
+       } else {
+         feedbackFriendAdded();
+         toast(`Friend request sent to @${invite.inviter_username}! 🎉`);
+       }
+       clearPendingInvite();
+       loadData();
+     } catch (err) {
+       console.error("[CallMe] redeem error:", err);
+       if (err instanceof Error && err.message.includes("timed out")) {
+         toast("Request timed out — check your connection and try again");
+       } else {
+         toast("Something went wrong — check your connection and try again");
+       }
+     } finally {
+       setSendingInviteRequest(false);
+     }
+   };
 
   const removeFriend = async (friendshipId: number, name: string) => {
     feedbackClick();
