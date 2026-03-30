@@ -210,33 +210,39 @@ export default function FriendsPage() {
     }
     loadData();
 
-    // Debounce Realtime updates to avoid hammering the database with concurrent queries
-    let reloadTimer: ReturnType<typeof setTimeout> | null = null;
-    const debouncedReload = () => {
-      if (reloadTimer) clearTimeout(reloadTimer);
-      reloadTimer = setTimeout(() => {
-        if (isMounted.current) {
-          loadData();
-        }
-      }, 1000); // Wait 1s after last change before reloading
-    };
+     // Debounce Realtime updates to avoid hammering the database with concurrent queries
+     // Use 500ms instead of 1s to feel more responsive when friends accept requests
+     let reloadTimer: ReturnType<typeof setTimeout> | null = null;
+     const debouncedReload = () => {
+       if (reloadTimer) clearTimeout(reloadTimer);
+       reloadTimer = setTimeout(() => {
+         if (isMounted.current) {
+           console.log("[CallMe] Realtime: reloading friend data after change");
+           loadData();
+         }
+       }, 500); // Wait 500ms after last change before reloading (was 1s)
+     };
 
-    // Subscribe to real-time friend request updates
-    const channel = supabase
-      .channel(`friends-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "friendships",
-        },
-        (payload) => {
-          // Any change to friendships (incoming or outgoing) - debounce the reload
-          debouncedReload();
-        }
-      )
-      .subscribe();
+     // Subscribe to real-time friend request updates
+     const channel = supabase
+       .channel(`friends-${user.id}`)
+       .on(
+         "postgres_changes",
+         {
+           event: "*",
+           schema: "public",
+           table: "friendships",
+         },
+         (payload) => {
+           // Any change to friendships (incoming or outgoing) - debounce the reload
+           console.log("[CallMe] Realtime: friendship change detected", payload.eventType, {
+             new: payload.new,
+             old: payload.old,
+           });
+           debouncedReload();
+         }
+       )
+       .subscribe();
 
     // Cleanup: unsubscribe and mark component as unmounted
     return () => {
