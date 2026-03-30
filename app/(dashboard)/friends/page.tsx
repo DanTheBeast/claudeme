@@ -274,7 +274,7 @@ export default function FriendsPage() {
        return;
      }
      toast("Friend request accepted! 🤝");
-     loadData(); // reload full data to update friends list and counts
+     await loadData(); // reload full data to update friends list and counts
      refreshUser(); // refreshes pending badge count
    };
 
@@ -317,7 +317,7 @@ export default function FriendsPage() {
         return;
       }
       toast("Request declined");
-      loadData();
+      await loadData(); // Ensure data is fresh after decline
       refreshUser(); // refreshes pending badge count
     };
 
