@@ -15,7 +15,7 @@ import { Toast } from "@/app/_components/toast";
 import type { Profile } from "@/app/_lib/types";
 import AuthPage from "@/app/auth/page";
 import { soundAppLaunch } from "@/app/_lib/haptics";
-import { registerPushNotifications, clearNotificationBadge } from "@/app/_lib/push-notifications";
+import { registerPushNotifications, clearNotificationBadge, setAppBadge } from "@/app/_lib/push-notifications";
 import { initSentry, setSentryUser, clearSentryUser } from "@/app/_lib/sentry";
 import { cacheClear } from "@/app/_lib/cache";
 import { SplashScreen } from "@capacitor/splash-screen";
@@ -460,6 +460,11 @@ export default function DashboardLayout({
   // here doesn't cause re-runs — it just satisfies exhaustive-deps correctly.
   }, [fetchProfile, supabase]);
 
+
+  // Update app badge when pending requests count changes
+  useEffect(() => {
+    setAppBadge(pendingRequests);
+  }, [pendingRequests]);
   const toast = useCallback((msg: string) => setToastMsg(msg), []);
 
   if (loading) {

@@ -8,6 +8,44 @@ import { Capacitor } from "@capacitor/core";
 let registrationPromise: Promise<void> | null = null;
 
 /**
+ * Set the app icon badge number (iOS only).
+ * On iOS: Shows a red badge with the number on the app icon
+ * On Android: Not implemented (Android doesn't have app icon badges in the same way)
+ * Pass 0 to clear the badge.
+ */
+export async function setAppBadge(count: number): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  if (Capacitor.getPlatform() !== 'ios') return; // Only works on iOS
+
+  try {
+    // Use Capacitor's plugin system to call native iOS code
+    // This is done via the global window object in the iOS webview
+    if (typeof (window as any).webkit !== 'undefined' && 
+        typeof (window as any).webkit.messageHandlers !== 'undefined' &&
+        typeof (window as any).webkit.messageHandlers.setAppBadge !== 'undefined') {
+      (window as any).webkit.messageHandlers.setAppBadge.postMessage({ value: count });
+      if (count > 0) {
+        console.log("[CallMe] app badge set to:", count);
+      } else {
+        console.log("[CallMe] app badge cleared");
+      }
+    } else {
+      // Fallback: try using direct Capacitor invoke
+      const { App } = await import('@capacitor/app');
+      // Note: This will fail gracefully if the method doesn't exist
+      try {
+        await (App as any).setAppBadge?.({ count });
+      } catch {
+        // Badge not supported on this version
+      }
+    }
+  } catch (err) {
+    // Badge setting may fail on some devices or Android, but it's not critical
+    console.warn("[CallMe] failed to set app badge:", err);
+  }
+}
+
+/**
  * Clear the app icon badge and dismiss all delivered notifications
  * from the notification center. Call this when the app comes to foreground.
  */
@@ -15,6 +53,8 @@ export async function clearNotificationBadge(): Promise<void> {
    if (!Capacitor.isNativePlatform()) return;
    try {
      await PushNotifications.removeAllDeliveredNotifications();
+     // Also clear the app icon badge
+     await setAppBadge(0);
    } catch {}
 }
 
