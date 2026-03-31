@@ -14,38 +14,6 @@
       ]
     }
   ],
-  "redirects": [
-    {
-      "source": "/friends",
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/friends/",
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/schedule",
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/schedule/",
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/profile",
-      "destination": "/",
-      "permanent": false
-    },
-    {
-      "source": "/profile/",
-      "destination": "/",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
       "source": "/admin",
