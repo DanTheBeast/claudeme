@@ -256,70 +256,79 @@ export default function FriendsPage() {
   // and filters out people already friended or with a pending request.
 
 
-   const acceptRequest = async (requestId: number) => {
-     if (pendingActionId) return; // prevent double-click
-     setPendingActionId(requestId);
-     feedbackSuccess();
-     // Optimistic update: remove from pending immediately, reload on success
-     const originalPending = pendingRequests;
-     setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-
-     const { error } = await supabase.from("friendships").update({ status: "accepted" }).eq("id", requestId);
-     setPendingActionId(null);
-     if (error) {
-       // Revert optimistic update on failure
-       setPendingRequests(originalPending);
-       feedbackError();
-       toast("Failed to accept request");
-       return;
-     }
-     toast("Friend request accepted! 🤝");
-     await loadData(); // reload full data to update friends list and counts
-     refreshUser(); // refreshes pending badge count
-   };
-
-    const cancelRequest = async (requestId: number) => {
+    const acceptRequest = async (requestId: number) => {
       if (pendingActionId) return; // prevent double-click
       setPendingActionId(requestId);
-      feedbackClick();
-      // Optimistic update: remove from outgoing immediately
-      const originalOutgoing = outgoingRequests;
-      setOutgoingRequests((prev) => prev.filter((r) => r.id !== requestId));
-
-      const { error } = await supabase.from("friendships").delete().eq("id", requestId);
-      setPendingActionId(null);
-      if (error) {
-        // Revert optimistic update on failure
-        setOutgoingRequests(originalOutgoing);
-        feedbackError();
-        toast("Failed to cancel request");
-        return;
-      }
-      toast("Request cancelled");
-      loadData();
-    };
-
-    const declineRequest = async (requestId: number) => {
-      if (pendingActionId) return; // prevent double-click
-      setPendingActionId(requestId);
-      feedbackClick();
-      // Optimistic update: remove from pending immediately
+      feedbackSuccess();
+      // Optimistic update: remove from pending immediately, reload on success
       const originalPending = pendingRequests;
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
 
-      const { error } = await supabase.from("friendships").delete().eq("id", requestId);
-      setPendingActionId(null);
+      const { error } = await supabase.from("friendships").update({ status: "accepted" }).eq("id", requestId);
       if (error) {
         // Revert optimistic update on failure
         setPendingRequests(originalPending);
         feedbackError();
-        toast("Failed to decline request");
+        toast("Failed to accept request");
+        setPendingActionId(null);
         return;
       }
-      toast("Request declined");
-      await loadData(); // Ensure data is fresh after decline
+      toast("Friend request accepted! 🤝");
+      // Small delay to ensure database replication is complete before reloading
+      await new Promise(resolve => setTimeout(resolve, 100));
+      await loadData(); // reload full data to update friends list and counts
       refreshUser(); // refreshes pending badge count
+      setPendingActionId(null);
     };
+
+     const cancelRequest = async (requestId: number) => {
+       if (pendingActionId) return; // prevent double-click
+       setPendingActionId(requestId);
+       feedbackClick();
+       // Optimistic update: remove from outgoing immediately
+       const originalOutgoing = outgoingRequests;
+       setOutgoingRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+       const { error } = await supabase.from("friendships").delete().eq("id", requestId);
+       if (error) {
+         // Revert optimistic update on failure
+         setOutgoingRequests(originalOutgoing);
+         feedbackError();
+         toast("Failed to cancel request");
+         setPendingActionId(null);
+         return;
+       }
+       toast("Request cancelled");
+       // Small delay to ensure database replication is complete before reloading
+       await new Promise(resolve => setTimeout(resolve, 100));
+       await loadData();
+       setPendingActionId(null);
+     };
+
+     const declineRequest = async (requestId: number) => {
+       if (pendingActionId) return; // prevent double-click
+       setPendingActionId(requestId);
+       feedbackClick();
+       // Optimistic update: remove from pending immediately
+       const originalPending = pendingRequests;
+       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+       const { error } = await supabase.from("friendships").delete().eq("id", requestId);
+       if (error) {
+         // Revert optimistic update on failure
+         setPendingRequests(originalPending);
+         feedbackError();
+         toast("Failed to decline request");
+         setPendingActionId(null);
+         return;
+       }
+       toast("Request declined");
+       // Small delay to ensure database replication is complete before reloading
+       await new Promise(resolve => setTimeout(resolve, 100));
+       await loadData(); // Ensure data is fresh after decline
+       refreshUser(); // refreshes pending badge count
+       setPendingActionId(null);
+     };
 
   // Called when the app is opened via a callme://invite?code=... deep link,
   // or when a user enters a code manually. Routes through the redeem-invite-code
