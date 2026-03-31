@@ -408,14 +408,14 @@ export default function DashboardLayout({
        const uid = session?.user?.id;
        if (!uid) return null;
 
-       // Wrap the channel subscription in a timeout guard to prevent hanging promises
-       // from blocking the cleanup function on unmount.
-       const timeoutPromise = new Promise<null>((resolve) =>
-         setTimeout(() => {
-           console.warn("[CallMe] realtime channel subscription timed out");
-           resolve(null);
-         }, 10000)
-       );
+        // Wrap the channel subscription in a timeout guard to prevent hanging promises
+        // from blocking the cleanup function on unmount.
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => {
+            console.warn("[CallMe] realtime channel subscription timed out");
+            resolve(null);
+          }, 30000)
+        );
 
         try {
           const channel = supabase
