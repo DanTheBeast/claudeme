@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { BottomNav } from "@/app/_components/bottom-nav";
 import { Toast } from "@/app/_components/toast";
@@ -117,28 +118,29 @@ function LoadingScreen() {
 }
 
 export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [user, setUser] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [authed, setAuthed] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [pendingRequests, setPendingRequests] = useState(0);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [pendingInviteFrom, setPendingInviteFrom] = useState<string | null>(null);
-  const [showInviteCodePrompt, setShowInviteCodePrompt] = useState(false);
-  const [inviteCodeInput, setInviteCodeInput] = useState("");
-  const [redeemingCode, setRedeemingCode] = useState(false);
-  const invitePromptShown = useRef(false);
-  const supabase = useMemo(() => createClient(), []);
-  const launchJinglePlayed = useRef(false);
-  const initialLoadDone = useRef(false);
-  const pushRegistered = useRef(false);
-  const splashHidden = useRef(false);
-  const foregroundBusy = useRef(false);
-  const backgroundedAt = useRef<number | null>(null);
+   children,
+ }: {
+   children: React.ReactNode;
+ }) {
+   const router = useRouter();
+   const [user, setUser] = useState<Profile | null>(null);
+   const [loading, setLoading] = useState(true);
+   const [authed, setAuthed] = useState(false);
+   const [toastMsg, setToastMsg] = useState<string | null>(null);
+   const [pendingRequests, setPendingRequests] = useState(0);
+   const [refreshKey, setRefreshKey] = useState(0);
+   const [pendingInviteFrom, setPendingInviteFrom] = useState<string | null>(null);
+   const [showInviteCodePrompt, setShowInviteCodePrompt] = useState(false);
+   const [inviteCodeInput, setInviteCodeInput] = useState("");
+   const [redeemingCode, setRedeemingCode] = useState(false);
+   const invitePromptShown = useRef(false);
+   const supabase = useMemo(() => createClient(), []);
+   const launchJinglePlayed = useRef(false);
+   const initialLoadDone = useRef(false);
+   const pushRegistered = useRef(false);
+   const splashHidden = useRef(false);
+   const foregroundBusy = useRef(false);
+   const backgroundedAt = useRef<number | null>(null);
 
   const hideSplash = useCallback(async () => {
     if (splashHidden.current) return;
@@ -335,11 +337,27 @@ export default function DashboardLayout({
         const url = new URL(data.url);
         console.log("[CallMe] appUrlOpen:", data.url);
 
-        // /friends path — opened from Universal Link (email, web, etc)
-        if (url.pathname === "/friends" || url.pathname === "/friends/") {
-          console.log("[CallMe] Opening friends page from deep link");
-          return;
-        }
+         // /friends path — opened from Universal Link (email, web, etc)
+         if (url.pathname === "/friends" || url.pathname === "/friends/") {
+           console.log("[CallMe] Opening friends page from deep link");
+           // Navigate to the friends page in the web app
+           router.push("/friends");
+           return;
+         }
+         
+         // /schedule path — opened from Universal Link
+         if (url.pathname === "/schedule" || url.pathname === "/schedule/") {
+           console.log("[CallMe] Opening schedule page from deep link");
+           router.push("/schedule");
+           return;
+         }
+         
+         // /profile path — opened from Universal Link
+         if (url.pathname === "/profile" || url.pathname === "/profile/") {
+           console.log("[CallMe] Opening profile page from deep link");
+           router.push("/profile");
+           return;
+         }
 
         // callme://invite?code=x7k2m9ab — opened from a personal invite link
         // url.host === "invite" because callme://invite parses "invite" as the host

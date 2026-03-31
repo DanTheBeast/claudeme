@@ -79,8 +79,8 @@ async function sendPush(token: string, senderName: string) {
 
 async function sendEmail(toEmail: string, toName: string, senderName: string): Promise<void> {
    const appUrl = "https://justcallme.app";
-   // Custom scheme - iOS will open app directly when app is installed
-   const friendsLink = `callme://friends?utm_source=email&utm_medium=friend_request`;
+   // Universal Link - iOS will open app if installed (via Associated Domains), otherwise website
+   const friendsLink = `${appUrl}/friends?utm_source=email&utm_medium=friend_request`;
 
   const html = `<!DOCTYPE html>
 <html>
