@@ -335,8 +335,8 @@ export default function DashboardLayout({
         const url = new URL(data.url);
         console.log("[CallMe] appUrlOpen:", data.url);
 
-        // callme://friends — opened from email friend request link
-        if (url.host === "friends") {
+        // /friends path — opened from Universal Link (email, web, etc)
+        if (url.pathname === "/friends" || url.pathname === "/friends/") {
           console.log("[CallMe] Opening friends page from deep link");
           return;
         }
