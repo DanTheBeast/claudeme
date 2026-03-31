@@ -79,10 +79,8 @@ async function sendPush(token: string, senderName: string) {
 
 async function sendEmail(toEmail: string, toName: string, senderName: string): Promise<void> {
   const appUrl = "https://justcallme.app";
-  // Deep link that will open the app if installed, or the website if not
-  const appDeepLink = "callme:///friends";
-  // Fallback URL that opens the website
-  const webFallbackUrl = `${appUrl}?utm_source=email&utm_medium=friend_request`;
+  // Deep link that opens the friends page in the app
+  const friendsDeepLink = `${appUrl}/friends?utm_source=email&utm_medium=friend_request`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -120,12 +118,12 @@ async function sendEmail(toEmail: string, toName: string, senderName: string): P
                 Open the app to accept and start seeing when each other is free to talk.
               </p>
 
-              <!-- CTA Button: Tries to open app via deep link, falls back to website -->
+              <!-- CTA Button: Opens friends page (works in app and on website) -->
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td align="center">
-                    <!-- Main link uses deep link with JavaScript fallback -->
-                    <a href="${appDeepLink}" onclick="if (!this.href.startsWith('http')) window.location='${webFallbackUrl}'; return false;"
+                    <!-- Link to /friends page - will open in app if installed, website otherwise -->
+                    <a href="${friendsDeepLink}"
                       style="display:inline-block;background:linear-gradient(135deg,#D46B50,#DE7F65);color:#ffffff;
                              text-decoration:none;font-size:16px;font-weight:600;padding:14px 36px;
                              border-radius:14px;letter-spacing:-0.2px;">

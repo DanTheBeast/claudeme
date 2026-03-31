@@ -333,6 +333,16 @@ export default function DashboardLayout({
     const appUrlListenerPromise = CapApp.addListener("appUrlOpen", async (data: { url: string }) => {
       try {
         const url = new URL(data.url);
+        console.log("[CallMe] appUrlOpen:", data.url);
+
+        // Handle /friends path (from email link)
+        if (url.pathname === "/friends" || url.pathname === "/friends/") {
+          console.log("[CallMe] Opening friends page from deep link");
+          // The router will handle navigation when this component re-renders
+          // Just return to let the normal app navigation handle it
+          return;
+        }
+
         // callme://invite?code=x7k2m9ab — opened from a personal invite link
         // url.host === "invite" because callme://invite parses "invite" as the host
         if (url.host === "invite") {
@@ -342,6 +352,7 @@ export default function DashboardLayout({
           else if (from) setPendingInviteFrom(from);
           return;
         }
+
         // callme://open?access_token=...&refresh_token=... — email verification callback
         const accessToken = url.searchParams.get("access_token");
         const refreshToken = url.searchParams.get("refresh_token") || "";
@@ -350,9 +361,10 @@ export default function DashboardLayout({
           await fetchProfile();
           setRefreshKey((k) => k + 1);
         }
-      } catch {}
+      } catch (err) {
+        console.error("[CallMe] appUrlOpen error:", err);
+      }
     }).catch(() => null);
-
     // onAuthStateChange handles sign-in/sign-out transitions AFTER initial load.
     // IMPORTANT: only act on explicit SIGNED_OUT — never set authed=false on
     // TOKEN_REFRESHED or other transient events, which would unmount the entire
