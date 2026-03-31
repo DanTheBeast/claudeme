@@ -335,11 +335,9 @@ export default function DashboardLayout({
         const url = new URL(data.url);
         console.log("[CallMe] appUrlOpen:", data.url);
 
-        // Handle /friends path (from email link)
-        if (url.pathname === "/friends" || url.pathname === "/friends/") {
+        // callme://friends — opened from email friend request link
+        if (url.host === "friends") {
           console.log("[CallMe] Opening friends page from deep link");
-          // The router will handle navigation when this component re-renders
-          // Just return to let the normal app navigation handle it
           return;
         }
 

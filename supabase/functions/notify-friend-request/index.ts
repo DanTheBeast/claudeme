@@ -79,8 +79,10 @@ async function sendPush(token: string, senderName: string) {
 
 async function sendEmail(toEmail: string, toName: string, senderName: string): Promise<void> {
   const appUrl = "https://justcallme.app";
-  // Deep link that opens the friends page in the app
-  const friendsDeepLink = `${appUrl}/friends?utm_source=email&utm_medium=friend_request`;
+  // Deep link using custom URL scheme (callme://) - opens app if installed
+  const appDeepLink = "callme://friends";
+  // Fallback for email clients that don't support custom schemes
+  const webFallbackUrl = `${appUrl}/friends?utm_source=email&utm_medium=friend_request`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -118,12 +120,12 @@ async function sendEmail(toEmail: string, toName: string, senderName: string): P
                 Open the app to accept and start seeing when each other is free to talk.
               </p>
 
-              <!-- CTA Button: Opens friends page (works in app and on website) -->
+              <!-- CTA Button: Opens app via custom scheme, falls back to website -->
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
                   <td align="center">
-                    <!-- Link to /friends page - will open in app if installed, website otherwise -->
-                    <a href="${friendsDeepLink}"
+                    <!-- Primary link: Custom URL scheme (callme://friends) -->
+                    <a href="${appDeepLink}"
                       style="display:inline-block;background:linear-gradient(135deg,#D46B50,#DE7F65);color:#ffffff;
                              text-decoration:none;font-size:16px;font-weight:600;padding:14px 36px;
                              border-radius:14px;letter-spacing:-0.2px;">
@@ -132,6 +134,11 @@ async function sendEmail(toEmail: string, toName: string, senderName: string): P
                   </td>
                 </tr>
               </table>
+              
+              <!-- Fallback text link for email clients that block custom schemes -->
+              <p style="margin:16px 0 0;font-size:13px;color:#9ca3af;text-align:center;">
+                Can't open the app? <a href="${webFallbackUrl}" style="color:#D46B50;text-decoration:underline;">Open in browser</a>
+              </p>
             </td>
           </tr>
 
