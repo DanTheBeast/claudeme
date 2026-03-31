@@ -1,4 +1,30 @@
 {
+  "rewrites": [
+    {
+      "source": "/friends",
+      "destination": "/"
+    },
+    {
+      "source": "/friends/",
+      "destination": "/"
+    },
+    {
+      "source": "/schedule",
+      "destination": "/"
+    },
+    {
+      "source": "/schedule/",
+      "destination": "/"
+    },
+    {
+      "source": "/profile",
+      "destination": "/"
+    },
+    {
+      "source": "/profile/",
+      "destination": "/"
+    }
+  ],
   "headers": [
     {
       "source": "/.well-known/apple-app-site-association",
