@@ -1,28 +1,34 @@
 {
-  "rewrites": [
+  "redirects": [
     {
       "source": "/friends",
-      "destination": "/"
+      "destination": "/",
+      "permanent": false
     },
     {
       "source": "/friends/",
-      "destination": "/"
+      "destination": "/",
+      "permanent": false
     },
     {
       "source": "/schedule",
-      "destination": "/"
+      "destination": "/",
+      "permanent": false
     },
     {
       "source": "/schedule/",
-      "destination": "/"
+      "destination": "/",
+      "permanent": false
     },
     {
       "source": "/profile",
-      "destination": "/"
+      "destination": "/",
+      "permanent": false
     },
     {
       "source": "/profile/",
-      "destination": "/"
+      "destination": "/",
+      "permanent": false
     }
   ],
   "headers": [
