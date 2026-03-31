@@ -1,4 +1,13 @@
 {
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "Q4YA33U572.com.danfields5454.callme",
+        "paths": ["/friends", "/friends/", "/schedule", "/schedule/", "/profile", "/profile/"]
+      }
+    ]
+  },
   "webcredentials": {
     "apps": [
       "Q4YA33U572.com.danfields5454.callme"

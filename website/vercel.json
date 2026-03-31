@@ -6,8 +6,44 @@
         {
           "key": "Content-Type",
           "value": "application/json"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
         }
       ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/friends",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/friends/",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/schedule",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/schedule/",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/profile",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/profile/",
+      "destination": "/",
+      "permanent": false
     }
   ],
   "rewrites": [
