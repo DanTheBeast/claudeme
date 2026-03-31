@@ -79,78 +79,78 @@ async function sendPush(token: string, senderName: string) {
 
 async function sendEmail(toEmail: string, toName: string, senderName: string): Promise<void> {
    const appUrl = "https://justcallme.app";
-   // Universal Link - iOS will open app if installed (via Associated Domains), otherwise website
-   const friendsLink = `${appUrl}/friends?utm_source=email&utm_medium=friend_request`;
 
-  const html = `<!DOCTYPE html>
+   const html = `<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Friend Request on CallMe</title>
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <title>Friend Request on CallMe</title>
 </head>
 <body style="margin:0;padding:0;background:#FDFBF9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#FDFBF9;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+   <table width="100%" cellpadding="0" cellspacing="0" style="background:#FDFBF9;padding:40px 20px;">
+      <tr>
+         <td align="center">
+            <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
 
-          <!-- Logo -->
-          <tr>
-            <td align="center" style="padding-bottom:28px;">
-              <img src="${appUrl}/logo.png" alt="CallMe" width="64" height="64"
-                style="border-radius:18px;display:block;" />
-              <p style="margin:10px 0 0;font-size:22px;font-weight:700;color:#1a1a1a;letter-spacing:-0.5px;">CallMe</p>
-            </td>
-          </tr>
-
-          <!-- Card -->
-          <tr>
-            <td style="background:#ffffff;border-radius:22px;padding:36px 32px;border:1px solid #f0ede8;">
-              <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#D46B50;text-transform:uppercase;letter-spacing:1px;">
-                Friend Request
-              </p>
-              <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#1a1a1a;line-height:1.2;">
-                ${senderName} wants to connect
-              </h1>
-              <p style="margin:0 0 28px;font-size:16px;color:#6b7280;line-height:1.6;">
-                Hey ${toName}, <strong>${senderName}</strong> sent you a friend request on CallMe.
-                Open the app to accept and start seeing when each other is free to talk.
-              </p>
-
-              <!-- CTA Button: Universal Link opens app on iOS, website on other platforms -->
-              <table cellpadding="0" cellspacing="0" width="100%">
-                <tr>
-                  <td align="center">
-                    <a href="${friendsLink}"
-                      style="display:inline-block;background:linear-gradient(135deg,#D46B50,#DE7F65);color:#ffffff;
-                             text-decoration:none;font-size:16px;font-weight:600;padding:14px 36px;
-                             border-radius:14px;letter-spacing:-0.2px;">
-                      Open CallMe →
-                    </a>
+               <!-- Logo -->
+               <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                     <img src="${appUrl}/logo.png" alt="CallMe" width="64" height="64"
+                        style="border-radius:18px;display:block;" />
+                     <p style="margin:10px 0 0;font-size:22px;font-weight:700;color:#1a1a1a;letter-spacing:-0.5px;">CallMe</p>
                   </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+               </tr>
 
-          <!-- Footer -->
-          <tr>
-            <td align="center" style="padding-top:24px;">
-              <p style="margin:0;font-size:12px;color:#9ca3af;">
-                © 2026 CallMe &nbsp;·&nbsp;
-                <a href="${appUrl}/privacy.html" style="color:#9ca3af;">Privacy Policy</a>
-              </p>
-              <p style="margin:6px 0 0;font-size:12px;color:#d1d5db;">
-                You received this because someone sent you a friend request.
-              </p>
-            </td>
-          </tr>
+               <!-- Card -->
+               <tr>
+                  <td style="background:#ffffff;border-radius:22px;padding:36px 32px;border:1px solid #f0ede8;">
+                     <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#D46B50;text-transform:uppercase;letter-spacing:1px;">
+                        Friend Request
+                     </p>
+                     <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#1a1a1a;line-height:1.2;">
+                        ${senderName} wants to connect
+                     </h1>
+                     <p style="margin:0 0 28px;font-size:16px;color:#6b7280;line-height:1.6;">
+                        Hey ${toName}, <strong>${senderName}</strong> sent you a friend request on CallMe.
+                     </p>
+                     <p style="margin:0 0 28px;font-size:16px;color:#6b7280;line-height:1.6;">
+                        Open the CallMe app and tap the <strong>Friends</strong> tab to accept the request and start seeing when you're both free to talk.
+                     </p>
 
-        </table>
-      </td>
-    </tr>
-  </table>
+                     <!-- CTA Button -->
+                     <table cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                           <td align="center">
+                              <a href="https://apps.apple.com/app/callme/id1234567890"
+                                 style="display:inline-block;background:linear-gradient(135deg,#D46B50,#DE7F65);color:#ffffff;
+                                        text-decoration:none;font-size:16px;font-weight:600;padding:14px 36px;
+                                        border-radius:14px;letter-spacing:-0.2px;">
+                                 Get CallMe →
+                              </a>
+                           </td>
+                        </tr>
+                     </table>
+                  </td>
+               </tr>
+
+               <!-- Footer -->
+               <tr>
+                  <td align="center" style="padding-top:24px;">
+                     <p style="margin:0;font-size:12px;color:#9ca3af;">
+                        © 2026 CallMe &nbsp;·&nbsp;
+                        <a href="${appUrl}/privacy.html" style="color:#9ca3af;">Privacy Policy</a>
+                     </p>
+                     <p style="margin:6px 0 0;font-size:12px;color:#d1d5db;">
+                        You received this because someone sent you a friend request.
+                     </p>
+                  </td>
+               </tr>
+
+            </table>
+         </td>
+      </tr>
+   </table>
 </body>
 </html>`;
 
