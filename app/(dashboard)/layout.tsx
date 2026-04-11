@@ -402,21 +402,27 @@ export default function DashboardLayout({
       // the session is still valid and no user data has changed.
       if (event === "TOKEN_REFRESHED") return;
 
-      if (session?.user) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-        if (data) setUser(data as Profile);
-        setAuthed(true);
-        if (!pushRegistered.current) {
-          pushRegistered.current = true;
-          registerPushNotifications(session.user.id, supabase).catch((e) => {
-            console.error("[CallMe] push registration failed:", e);
-          });
-        }
-      }
+       if (session?.user) {
+         try {
+           const { data, error } = await supabase
+             .from("profiles")
+             .select("*")
+             .eq("id", session.user.id)
+             .single();
+           if (error) throw error;
+           if (data) setUser(data as Profile);
+         } catch (err) {
+           console.error("[CallMe] Failed to fetch profile in auth listener:", err);
+           // Don't sign out — let app stay mounted with existing user data
+         }
+         setAuthed(true);
+         if (!pushRegistered.current) {
+           pushRegistered.current = true;
+           registerPushNotifications(session.user.id, supabase).catch((e) => {
+             console.error("[CallMe] push registration failed:", e);
+           });
+         }
+       }
     });
 
     // Scope the Realtime subscription to the current user's row only —

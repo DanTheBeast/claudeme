@@ -226,17 +226,18 @@ export default function FriendsPage() {
        }, 500); // Wait 500ms after last change before reloading (was 1s)
      };
 
-     // Subscribe to real-time friend request updates
-     const channel = supabase
-       .channel(`friends-${user.id}`)
-       .on(
-         "postgres_changes",
-         {
-           event: "*",
-           schema: "public",
-           table: "friendships",
-         },
-          (payload) => {
+      // Subscribe to real-time friend request updates
+      const channel = supabase
+        .channel(`friends-${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "friendships",
+            filter: `or(user_id.eq.${user.id},friend_id.eq.${user.id})`,
+          },
+           (payload) => {
             // Any change to friendships (incoming or outgoing) - debounce the reload
             // Skip if user is actively typing in the invite code field to avoid UI freezes
             if (isTyping) {
@@ -749,31 +750,31 @@ export default function FriendsPage() {
                 Enter a code from someone you want to be friends with:
               </p>
               
-               {/* Code input */}
-                 <input
-                   type="text"
-                   value={inviteCodeInputRaw}
-                   onChange={(e) => {
-                     const input = e.target.value.toLowerCase().trim();
-                     // Update the displayed value immediately for UX
-                     setInviteCodeInputRaw(input.slice(0, 8));
-                     setIsTyping(true);
-                     
-                     // Debounce the actual code validation/extraction
-                     if (inviteInputDebounceTimer.current) clearTimeout(inviteInputDebounceTimer.current);
-                     inviteInputDebounceTimer.current = setTimeout(() => {
-                       // Extract 8-char code from any pasted text (handles full message pastes)
+                {/* Code input */}
+                   <input
+                     type="text"
+                     value={inviteCodeInput}
+                     onChange={(e) => {
+                       const input = e.target.value.toLowerCase().trim();
+                       setInviteCodeInputRaw(input);
+                       setIsTyping(true);
+                       
+                       // Extract 8-char code immediately for display
                        const codeMatch = input.match(/[23456789abcdefghjkmnpqrstuvwxyz]{8}/);
                        const extracted = codeMatch ? codeMatch[0] : input.slice(0, 8);
                        setInviteCodeInput(extracted);
-                       setIsTyping(false);
-                     }, 300); // Debounce for 300ms
-                   }}
-                   placeholder="Paste or type the invite code"
-                   autoCorrect="off"
-                   autoCapitalize="none"
-                   className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-base font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
-                 />
+                       
+                       // Debounce the realtime pause so it resets quickly after typing stops
+                       if (inviteInputDebounceTimer.current) clearTimeout(inviteInputDebounceTimer.current);
+                       inviteInputDebounceTimer.current = setTimeout(() => {
+                         setIsTyping(false);
+                       }, 300); // Pause realtime for 300ms after typing stops
+                     }}
+                     placeholder="Paste or type the invite code"
+                     autoCorrect="off"
+                     autoCapitalize="none"
+                     className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-base font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
+                   />
               
               {/* Redeem button */}
                <button
