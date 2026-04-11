@@ -118,19 +118,7 @@ async function sendEmail(toEmail: string, toName: string, senderName: string): P
                         Open the CallMe app and tap the <strong>Friends</strong> tab to accept the request and start seeing when you're both free to talk.
                      </p>
 
-                     <!-- CTA Button -->
-                     <table cellpadding="0" cellspacing="0" width="100%">
-                        <tr>
-                           <td align="center">
-                              <a href="https://apps.apple.com/app/callme/id1234567890"
-                                 style="display:inline-block;background:linear-gradient(135deg,#D46B50,#DE7F65);color:#ffffff;
-                                        text-decoration:none;font-size:16px;font-weight:600;padding:14px 36px;
-                                        border-radius:14px;letter-spacing:-0.2px;">
-                                 Get CallMe →
-                              </a>
-                           </td>
-                        </tr>
-                     </table>
+
                   </td>
                </tr>
 

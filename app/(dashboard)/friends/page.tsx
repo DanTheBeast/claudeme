@@ -58,9 +58,12 @@ export default function FriendsPage() {
     // Add Friends modal state
     const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
     const [inviteCodeInput, setInviteCodeInput] = useState("");
+    const [inviteCodeInputRaw, setInviteCodeInputRaw] = useState("");
     const [redeemingCode, setRedeemingCode] = useState(false);
     const [lastCodeGeneratedTime, setLastCodeGeneratedTime] = useState<number>(0);
     const [sharingCode, setSharingCode] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const inviteInputDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     
 
 
@@ -741,22 +744,31 @@ export default function FriendsPage() {
                 Enter a code from someone you want to be friends with:
               </p>
               
-              {/* Code input */}
-                <input
-                  type="text"
-                  value={inviteCodeInput}
-                  onChange={(e) => {
-                    const input = e.target.value.toLowerCase().trim();
-                    // Extract 8-char code from any pasted text (handles full message pastes)
-                    const codeMatch = input.match(/[23456789abcdefghjkmnpqrstuvwxyz]{8}/);
-                    const extracted = codeMatch ? codeMatch[0] : input.slice(0, 8);
-                    setInviteCodeInput(extracted);
-                  }}
-                  placeholder="Paste or type the invite code"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-base font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
-                />
+               {/* Code input */}
+                 <input
+                   type="text"
+                   value={inviteCodeInputRaw}
+                   onChange={(e) => {
+                     const input = e.target.value.toLowerCase().trim();
+                     // Update the displayed value immediately for UX
+                     setInviteCodeInputRaw(input.slice(0, 8));
+                     setIsTyping(true);
+                     
+                     // Debounce the actual code validation/extraction
+                     if (inviteInputDebounceTimer.current) clearTimeout(inviteInputDebounceTimer.current);
+                     inviteInputDebounceTimer.current = setTimeout(() => {
+                       // Extract 8-char code from any pasted text (handles full message pastes)
+                       const codeMatch = input.match(/[23456789abcdefghjkmnpqrstuvwxyz]{8}/);
+                       const extracted = codeMatch ? codeMatch[0] : input.slice(0, 8);
+                       setInviteCodeInput(extracted);
+                       setIsTyping(false);
+                     }, 300); // Debounce for 300ms
+                   }}
+                   placeholder="Paste or type the invite code"
+                   autoCorrect="off"
+                   autoCapitalize="none"
+                   className="w-full px-4 py-3 border border-gray-200 rounded-[14px] text-base font-mono bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-callme/20 focus:border-callme mb-3"
+                 />
               
               {/* Redeem button */}
                <button
