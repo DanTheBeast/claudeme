@@ -81,70 +81,95 @@ export async function registerPushNotifications(
      return;
    }
 
-   // Mark this call as in-flight with an async closure
-   registrationPromise = (async () => {
-     // Remove any previously registered listeners before adding new ones.
-     // This prevents duplicate listeners if registerPushNotifications is ever
-     // called more than once in a session (e.g. race between the 1s defer and
-     // the 3s fallback retry in layout).
-     try { await PushNotifications.removeAllListeners(); } catch {}
+    // Mark this call as in-flight with an async closure
+    registrationPromise = (async () => {
+      try {
+        // Remove any previously registered listeners before adding new ones.
+        // This prevents duplicate listeners if registerPushNotifications is ever
+        // called more than once in a session (e.g. race between the 1s defer and
+        // the 3s fallback retry in layout).
+        try { await PushNotifications.removeAllListeners(); } catch {}
 
-     // Add listeners BEFORE calling register()
-     await PushNotifications.addListener("registration", async (token) => {
-       console.log("[CallMe] push token received:", token.value.slice(0, 16));
-       const { error } = await supabase.from("push_tokens").upsert(
-         {
-           user_id: userId,
-           token: token.value,
-           platform: Capacitor.getPlatform(),
-           updated_at: new Date().toISOString(),
-         },
-         { onConflict: "user_id,token" }
-       );
-       if (error) console.error("[CallMe] push token save error:", error.message);
-       else console.log("[CallMe] push token registered successfully");
-     });
+        // Add listeners BEFORE calling register()
+        try {
+          await PushNotifications.addListener("registration", async (token) => {
+            try {
+              console.log("[CallMe] push token received:", token.value.slice(0, 16));
+              const { error } = await supabase.from("push_tokens").upsert(
+                {
+                  user_id: userId,
+                  token: token.value,
+                  platform: Capacitor.getPlatform(),
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "user_id,token" }
+              );
+              if (error) console.error("[CallMe] push token save error:", error.message);
+              else console.log("[CallMe] push token registered successfully");
+            } catch (err) {
+              console.error("[CallMe] push token handler error:", err);
+            }
+          });
+        } catch (err) {
+          console.error("[CallMe] failed to add registration listener:", err);
+        }
 
-     await PushNotifications.addListener("registrationError", (err) => {
-       console.error("[CallMe] push registration error:", JSON.stringify(err));
-     });
+        try {
+          await PushNotifications.addListener("registrationError", (err) => {
+            console.error("[CallMe] push registration error:", JSON.stringify(err));
+          });
+        } catch (err) {
+          console.error("[CallMe] failed to add registrationError listener:", err);
+        }
 
-     const permission = await PushNotifications.requestPermissions();
-     if (permission.receive !== "granted") {
-       console.log("[CallMe] push permission denied:", permission.receive);
-       return;
-     }
+        const permission = await PushNotifications.requestPermissions();
+        if (permission.receive !== "granted") {
+          console.log("[CallMe] push permission denied:", permission.receive);
+          return;
+        }
 
-     await PushNotifications.register();
+        await PushNotifications.register();
 
-     // Handle notification tap — deep link into the app.
-     // Only added after permission is confirmed so it never accumulates on
-     // devices where the user has denied notifications.
-     // Only allow navigation to known internal paths to prevent open redirect.
-     const ALLOWED_PATHS = ["/", "/friends", "/schedule", "/profile"];
-     PushNotifications.addListener(
-       "pushNotificationActionPerformed",
-       (action) => {
-         const deepLink = action.notification.data?.deepLink as string | undefined;
-         if (!deepLink || typeof window === "undefined") return;
-         try {
-           const url = new URL(deepLink, window.location.href);
-           // Must be same origin (capacitor://localhost or https://justcallme.app)
-           // and path must be in the allowed list
-           const isSameOrigin = url.origin === window.location.origin ||
-             url.origin === "https://justcallme.app";
-           const isAllowed = ALLOWED_PATHS.some(
-             (p) => url.pathname === p || url.pathname === p + "/"
-           );
-           if (isSameOrigin && isAllowed) {
-             window.location.href = url.pathname;
-           }
-         } catch {
-           // Malformed URL — ignore
-         }
-       }
-     );
-   })();
+        // Handle notification tap — deep link into the app.
+        // Only added after permission is confirmed so it never accumulates on
+        // devices where the user has denied notifications.
+        // Only allow navigation to known internal paths to prevent open redirect.
+        const ALLOWED_PATHS = ["/", "/friends", "/schedule", "/profile"];
+        try {
+          PushNotifications.addListener(
+            "pushNotificationActionPerformed",
+            (action) => {
+              try {
+                const deepLink = action.notification.data?.deepLink as string | undefined;
+                if (!deepLink || typeof window === "undefined") return;
+                try {
+                  const url = new URL(deepLink, window.location.href);
+                  // Must be same origin (capacitor://localhost or https://justcallme.app)
+                  // and path must be in the allowed list
+                  const isSameOrigin = url.origin === window.location.origin ||
+                    url.origin === "https://justcallme.app";
+                  const isAllowed = ALLOWED_PATHS.some(
+                    (p) => url.pathname === p || url.pathname === p + "/"
+                  );
+                  if (isSameOrigin && isAllowed) {
+                    window.location.href = url.pathname;
+                  }
+                } catch {
+                  // Malformed URL — ignore
+                }
+              } catch (err) {
+                console.error("[CallMe] notification action handler error:", err);
+              }
+            }
+          );
+        } catch (err) {
+          console.error("[CallMe] failed to add pushNotificationActionPerformed listener:", err);
+        }
+      } catch (err) {
+        console.error("[CallMe] push notification registration failed:", err);
+        throw err;
+      }
+    })();
 
    await registrationPromise;
 }
