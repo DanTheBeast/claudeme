@@ -236,14 +236,19 @@ export default function FriendsPage() {
            schema: "public",
            table: "friendships",
          },
-         (payload) => {
-           // Any change to friendships (incoming or outgoing) - debounce the reload
-           console.log("[CallMe] Realtime: friendship change detected", payload.eventType, {
-             new: payload.new,
-             old: payload.old,
-           });
-           debouncedReload();
-         }
+          (payload) => {
+            // Any change to friendships (incoming or outgoing) - debounce the reload
+            // Skip if user is actively typing in the invite code field to avoid UI freezes
+            if (isTyping) {
+              console.log("[CallMe] Realtime: skipping update while user is typing");
+              return;
+            }
+            console.log("[CallMe] Realtime: friendship change detected", payload.eventType, {
+              new: payload.new,
+              old: payload.old,
+            });
+            debouncedReload();
+          }
        )
        .subscribe();
 
