@@ -856,75 +856,66 @@ export default function FriendsPage() {
                       console.log("[CallMe] Insert payload:", insertPayload);
                       console.log("[CallMe] Current user session:", { userId: user.id, username: user.username });
 
-                      // OFFLINE-FIRST APPROACH: Save code locally IMMEDIATELY
-                      // This ensures the user can always share, even if DB fails
-                      const pendingCode = {
-                        ...insertPayload,
-                        created_at: new Date().toISOString(),
-                        synced: false,
-                      };
-                      savePendingInviteCode(user.id, pendingCode);
-                      console.log("[CallMe] Code saved to local storage - user can share now");
-
-                      // Try to sync to database (non-blocking)
-                      console.log("[CallMe] Attempting to sync code to database...");
+                      // CRITICAL: Save code to database - this MUST succeed or user cannot add friends
+                      console.log("[CallMe] Attempting to save code to database...");
                       // IMPORTANT: This insert can fail if:
                       // 1. User's auth session is invalid (RLS check fails)
                       // 2. Network timeout (>10s) - request is abandoned mid-flight
                       // 3. Database is down or unreachable
                       // 4. Duplicate code (extremely unlikely, but possible)
                       
-                      // CRITICAL: Retry mechanism with exponential backoff
-                      let insertError: any = null;
-                      let insertData: any = null;
-                      let retryCount = 0;
-                      const maxRetries = 2;
-                      
-                        while (retryCount <= maxRetries && !insertData) {
-                          try {
-                            const attemptTime = Date.now();
-                            console.log(`[CallMe] Insert attempt ${retryCount + 1}/${maxRetries + 1} at ${new Date(attemptTime).toISOString()}...`);
-                            // OPTIMIZATION: Don't use .select() - it's unnecessary and slow
-                            // We don't need the response data, just need to know if it succeeded
-                            const insertResponse = await withTimeout(supabase
-                              .from("invite_codes")
-                              .insert(insertPayload), 3000); // Reduced timeout to 3s
-                            const responseTime = Date.now();
-                            console.log(`[CallMe] Insert response received after ${responseTime - attemptTime}ms`);
-                            insertError = insertResponse.error;
-                            // If no error, mark as success (we don't need the returned data)
-                            insertData = insertError ? null : [insertPayload];
-                            console.log(`[CallMe] Insert result - error: ${!!insertError}, success: ${!!insertData}`);
-                          
-                          if (insertError && retryCount < maxRetries) {
-                            // Retry after brief delay
-                            const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-                            console.log(`[CallMe] Insert failed, retrying in ${delay}ms...`);
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                            retryCount++;
-                          } else {
-                            break;
-                          }
-                        } catch (err) {
-                          console.error(`[CallMe] insert attempt ${retryCount + 1} threw error:`, err);
-                          insertError = err;
-                          if (retryCount < maxRetries) {
-                            const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-                            console.log(`[CallMe] Insert threw error, retrying in ${delay}ms...`);
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                            retryCount++;
-                          } else {
-                            break;
-                          }
+                       // CRITICAL: Retry mechanism - code MUST get into database
+                       let insertError: any = null;
+                       let insertData: any = null;
+                       let retryCount = 0;
+                       const maxRetries = 4; // Increased from 2 to 4 - give database real chance to respond
+                       
+                         while (retryCount <= maxRetries && !insertData) {
+                           try {
+                             const attemptTime = Date.now();
+                             console.log(`[CallMe] Insert attempt ${retryCount + 1}/${maxRetries + 1}...`);
+                             
+                             // Try to insert - this MUST succeed before we proceed
+                             const insertResponse = await withTimeout(supabase
+                               .from("invite_codes")
+                               .insert(insertPayload), 5000); // 5s timeout per attempt
+                             
+                             const responseTime = Date.now();
+                             console.log(`[CallMe] Response received in ${responseTime - attemptTime}ms - error: ${!!insertResponse.error}`);
+                             
+                             insertError = insertResponse.error;
+                             // If no error, mark as success
+                             insertData = insertError ? null : [insertPayload];
+                           
+                             if (insertError && retryCount < maxRetries) {
+                               // Exponential backoff: 500ms, 1s, 2s, 4s, 8s
+                               const delay = 500 * Math.pow(2, retryCount);
+                               console.log(`[CallMe] Insert failed (${(insertError as any).message}), retrying in ${delay}ms...`);
+                               await new Promise(resolve => setTimeout(resolve, delay));
+                               retryCount++;
+                             } else {
+                               break;
+                             }
+                           } catch (err) {
+                             console.error(`[CallMe] Insert attempt threw error:`, err);
+                             insertError = err;
+                             if (retryCount < maxRetries) {
+                               const delay = 500 * Math.pow(2, retryCount);
+                               console.log(`[CallMe] Retrying in ${delay}ms...`);
+                               await new Promise(resolve => setTimeout(resolve, delay));
+                               retryCount++;
+                             } else {
+                               break;
+                             }
+                           }
                         }
-                      }
 
                        console.log("[CallMe] Insert response:", { insertData, insertError });
                        
-                        // OFFLINE-FIRST: Even if database insert fails, we already have code in local storage
-                        // So we can always proceed to share dialog
-                        if (insertError) {
-                          console.error("[CallMe] Database sync failed - full error:", JSON.stringify(insertError, null, 2));
+                       // CRITICAL: Database insert must succeed before allowing user to share
+                         // Otherwise their friend will get "code not found" when trying to redeem it
+                         if (insertError) {
+                          console.error("[CallMe] Database insert failed after all retries:", JSON.stringify(insertError, null, 2));
                           const errorDetails = {
                             code: (insertError as any).code,
                             message: (insertError as any).message || insertError?.toString?.(),
@@ -932,8 +923,9 @@ export default function FriendsPage() {
                             hint: (insertError as any).hint,
                             inviter_id: user.id,
                             timestamp: new Date().toISOString(),
+                            attempts: maxRetries + 1,
                           };
-                          console.error("[CallMe] Database sync error details:", errorDetails);
+                          console.error("[CallMe] Full error details:", errorDetails);
                           logInviteCodeEvent({ 
                             code, 
                             userId: user.id, 
@@ -949,33 +941,12 @@ export default function FriendsPage() {
                             return;
                           }
                           
-                          console.warn("[CallMe] DATABASE SYNC FAILED - But code is safe locally! Retrying in background...");
-                          toast("Code is ready to share — retrying to save it...");
-                          
-                          // Retry saving in background (non-blocking)
-                          const attemptBackgroundRetry = () => {
-                            setTimeout(async () => {
-                              try {
-                                console.log("[CallMe] Background sync retry...");
-                                const retryResponse = await withTimeout(supabase
-                                  .from("invite_codes")
-                                  .insert(insertPayload), 3000);
-                                if (!retryResponse.error) {
-                                  console.log("[CallMe] Background sync succeeded!");
-                                  markInviteCodeAsSynced(user.id, code);
-                                } else {
-                                  console.error("[CallMe] Background sync failed, will retry again");
-                                  attemptBackgroundRetry();
-                                }
-                              } catch (e) {
-                                console.log("[CallMe] Background sync threw error, will retry again");
-                                attemptBackgroundRetry();
-                              }
-                            }, 15000); // Retry every 15 seconds
-                          };
-                          attemptBackgroundRetry();
+                          // Database is not responding - this is a critical issue
+                          console.error("[CallMe] CRITICAL: Database insert failed! Code cannot be shared.");
+                          toast("Unable to generate code - check your connection and try again");
+                          return; // BLOCK: Don't show share dialog if code isn't in database
                         } else {
-                          console.log("[CallMe] Code synced to database successfully!");
+                          console.log("[CallMe] Code successfully inserted into database!");
                           markInviteCodeAsSynced(user.id, code);
                           logInviteCodeEvent({ code, userId: user.id, event: "sync_success" });
                         }
