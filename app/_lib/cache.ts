@@ -66,17 +66,82 @@ export function withTimeout<T>(promise: PromiseLike<T>, ms = 10000): Promise<T> 
 }
 
 export function cacheClear(userId: string): void {
+   if (typeof window === "undefined") return;
+   try {
+     Object.keys(localStorage)
+       .filter((k) => k.startsWith(PREFIX))
+       .forEach((k) => {
+         try {
+           const raw = localStorage.getItem(k);
+           if (!raw) return;
+           const entry = JSON.parse(raw) as CacheEntry<unknown>;
+           if (entry.userId === userId) localStorage.removeItem(k);
+         } catch {}
+       });
+   } catch {}
+}
+
+/**
+ * CRITICAL FEATURE: Offline-first invite code management
+ * Stores pending invite codes locally so the user can always share
+ * even if the database insert fails. Syncs in background.
+ */
+const PENDING_CODES_KEY = "callme_pending_invite_codes_";
+
+interface PendingInviteCode {
+  code: string;
+  inviter_id: string;
+  inviter_username: string;
+  created_at: string;
+  synced: boolean; // Has this been successfully saved to DB?
+}
+
+export function savePendingInviteCode(userId: string, code: PendingInviteCode): void {
   if (typeof window === "undefined") return;
   try {
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith(PREFIX))
-      .forEach((k) => {
-        try {
-          const raw = localStorage.getItem(k);
-          if (!raw) return;
-          const entry = JSON.parse(raw) as CacheEntry<unknown>;
-          if (entry.userId === userId) localStorage.removeItem(k);
-        } catch {}
-      });
-  } catch {}
+    const key = PENDING_CODES_KEY + userId;
+    const existing = localStorage.getItem(key);
+    const codes: PendingInviteCode[] = existing ? JSON.parse(existing) : [];
+    codes.push(code);
+    // Keep only last 50 pending codes
+    localStorage.setItem(key, JSON.stringify(codes.slice(-50)));
+  } catch (e) {
+    console.warn("[CallMe] Failed to save pending invite code:", e);
+  }
+}
+
+export function getPendingInviteCodes(userId: string): PendingInviteCode[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const key = PENDING_CODES_KEY + userId;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.warn("[CallMe] Failed to get pending invite codes:", e);
+    return [];
+  }
+}
+
+export function markInviteCodeAsSynced(userId: string, code: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const key = PENDING_CODES_KEY + userId;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const codes: PendingInviteCode[] = JSON.parse(raw);
+    const updated = codes.map(c => c.code === code ? { ...c, synced: true } : c);
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch (e) {
+    console.warn("[CallMe] Failed to mark code as synced:", e);
+  }
+}
+
+export function clearPendingInviteCodes(userId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const key = PENDING_CODES_KEY + userId;
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.warn("[CallMe] Failed to clear pending invite codes:", e);
+  }
 }

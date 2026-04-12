@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
-import { cacheRead, cacheWrite, withTimeout } from "@/app/_lib/cache";
+import { cacheRead, cacheWrite, withTimeout, savePendingInviteCode, markInviteCodeAsSynced } from "@/app/_lib/cache";
 import { useApp } from "../layout";
 import { feedbackFriendAdded, feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { Avatar } from "@/app/_components/avatar";
@@ -846,18 +846,26 @@ export default function FriendsPage() {
                        return;
                      }
                      
-                     const insertPayload = {
-                       code: code,
-                       inviter_id: user.id,
-                       inviter_username: user.username,
-                     };
-                     console.log("[CallMe] Insert payload:", insertPayload);
-                     console.log("[CallMe] Current user session:", { userId: user.id, username: user.username });
+                      const insertPayload = {
+                        code: code,
+                        inviter_id: user.id,
+                        inviter_username: user.username,
+                      };
+                      console.log("[CallMe] Insert payload:", insertPayload);
+                      console.log("[CallMe] Current user session:", { userId: user.id, username: user.username });
 
-                     // CRITICAL CHANGE: Save to database FIRST (before showing share dialog)
-                     // This way the code is safe in the database immediately
-                     // and the app doesn't block on the Share.share() promise
-                      console.log("[CallMe] Saving code to database (before share)...");
+                      // OFFLINE-FIRST APPROACH: Save code locally IMMEDIATELY
+                      // This ensures the user can always share, even if DB fails
+                      const pendingCode = {
+                        ...insertPayload,
+                        created_at: new Date().toISOString(),
+                        synced: false,
+                      };
+                      savePendingInviteCode(user.id, pendingCode);
+                      console.log("[CallMe] Code saved to local storage - user can share now");
+
+                      // Try to sync to database (non-blocking)
+                      console.log("[CallMe] Attempting to sync code to database...");
                       // IMPORTANT: This insert can fail if:
                       // 1. User's auth session is invalid (RLS check fails)
                       // 2. Network timeout (>10s) - request is abandoned mid-flight
@@ -870,19 +878,21 @@ export default function FriendsPage() {
                       let retryCount = 0;
                       const maxRetries = 2;
                       
-                       while (retryCount <= maxRetries && !insertData) {
-                         try {
-                           const attemptTime = Date.now();
-                           console.log(`[CallMe] Insert attempt ${retryCount + 1}/${maxRetries + 1} at ${new Date(attemptTime).toISOString()}...`);
-                           const insertResponse = await withTimeout(supabase
-                             .from("invite_codes")
-                             .insert(insertPayload)
-                             .select(), 5000); // Reduced from 10s to 5s
-                           const responseTime = Date.now();
-                           console.log(`[CallMe] Insert response received after ${responseTime - attemptTime}ms`);
-                           insertError = insertResponse.error;
-                           insertData = insertResponse.data;
-                           console.log(`[CallMe] Insert result - error: ${!!insertError}, data: ${!!insertData}`);
+                        while (retryCount <= maxRetries && !insertData) {
+                          try {
+                            const attemptTime = Date.now();
+                            console.log(`[CallMe] Insert attempt ${retryCount + 1}/${maxRetries + 1} at ${new Date(attemptTime).toISOString()}...`);
+                            // OPTIMIZATION: Don't use .select() - it's unnecessary and slow
+                            // We don't need the response data, just need to know if it succeeded
+                            const insertResponse = await withTimeout(supabase
+                              .from("invite_codes")
+                              .insert(insertPayload), 3000); // Reduced timeout to 3s
+                            const responseTime = Date.now();
+                            console.log(`[CallMe] Insert response received after ${responseTime - attemptTime}ms`);
+                            insertError = insertResponse.error;
+                            // If no error, mark as success (we don't need the returned data)
+                            insertData = insertError ? null : [insertPayload];
+                            console.log(`[CallMe] Insert result - error: ${!!insertError}, success: ${!!insertData}`);
                           
                           if (insertError && retryCount < maxRetries) {
                             // Retry after brief delay
@@ -907,59 +917,59 @@ export default function FriendsPage() {
                         }
                       }
 
-                      console.log("[CallMe] Insert response:", { insertData, insertError });
-                      
-                       if (insertError) {
-                         console.error("[CallMe] failed to save code - full error:", JSON.stringify(insertError, null, 2));
-                         const errorDetails = {
-                           code: (insertError as any).code,
-                           message: (insertError as any).message || insertError?.toString?.(),
-                           details: (insertError as any).details,
-                           hint: (insertError as any).hint,
-                           inviter_id: user.id,
-                           payload: insertPayload,
-                           timestamp: new Date().toISOString(),
-                         };
-                         console.error("[CallMe] code generation failed with details:", errorDetails);
-                         
-                         // Check if it's an RLS policy error or auth issue
-                         const errorMsg = ((insertError as any).message || "").toLowerCase();
-                         if ((insertError as any).code === "PGRST301" || errorMsg.includes("row-level security") || errorMsg.includes("permission")) {
-                           toast("Permission denied - signing you out. Please sign back in.");
-                           // Force sign out to refresh session
-                           await supabase.auth.signOut();
-                           return;
-                         }
-                         
-                         // CRITICAL FALLBACK: If database save fails, still show share dialog
-                         // with a warning so the user isn't completely blocked from adding friends.
-                         // The code will retry saving in the background.
-                         console.warn("[CallMe] DATABASE INSERT FAILED - showing fallback share dialog anyway");
-                         toast("Network issue — will retry saving this code. Please share it!");
-                         
-                         // Set a flag to retry saving this code in the background
-                         const failedCode = code;
-                         const retryAttempt = () => {
-                           setTimeout(async () => {
-                             try {
-                               const retryResponse = await withTimeout(supabase
-                                 .from("invite_codes")
-                                 .insert(insertPayload)
-                                 .select(), 5000);
-                               if (!retryResponse.error) {
-                                 console.log("[CallMe] Background retry succeeded!");
-                               }
-                             } catch (e) {
-                               console.log("[CallMe] Background retry also failed");
-                             }
-                           }, 5000);
-                         };
-                         retryAttempt();
-                         
-                         // Continue to share dialog anyway (code is at least generated locally)
-                       }
-
-                      console.log("[CallMe] Code saved successfully!", insertData);
+                       console.log("[CallMe] Insert response:", { insertData, insertError });
+                       
+                        // OFFLINE-FIRST: Even if database insert fails, we already have code in local storage
+                        // So we can always proceed to share dialog
+                        if (insertError) {
+                          console.error("[CallMe] Database sync failed - full error:", JSON.stringify(insertError, null, 2));
+                          const errorDetails = {
+                            code: (insertError as any).code,
+                            message: (insertError as any).message || insertError?.toString?.(),
+                            details: (insertError as any).details,
+                            hint: (insertError as any).hint,
+                            inviter_id: user.id,
+                            timestamp: new Date().toISOString(),
+                          };
+                          console.error("[CallMe] Database sync error details:", errorDetails);
+                          
+                          // Check if it's an RLS policy error or auth issue
+                          const errorMsg = ((insertError as any).message || "").toLowerCase();
+                          if ((insertError as any).code === "PGRST301" || errorMsg.includes("row-level security") || errorMsg.includes("permission")) {
+                            toast("Permission denied - signing you out. Please sign back in.");
+                            await supabase.auth.signOut();
+                            return;
+                          }
+                          
+                          console.warn("[CallMe] DATABASE SYNC FAILED - But code is safe locally! Retrying in background...");
+                          toast("Code is ready to share — retrying to save it...");
+                          
+                          // Retry saving in background (non-blocking)
+                          const attemptBackgroundRetry = () => {
+                            setTimeout(async () => {
+                              try {
+                                console.log("[CallMe] Background sync retry...");
+                                const retryResponse = await withTimeout(supabase
+                                  .from("invite_codes")
+                                  .insert(insertPayload), 3000);
+                                if (!retryResponse.error) {
+                                  console.log("[CallMe] Background sync succeeded!");
+                                  markInviteCodeAsSynced(user.id, code);
+                                } else {
+                                  console.error("[CallMe] Background sync failed, will retry again");
+                                  attemptBackgroundRetry();
+                                }
+                              } catch (e) {
+                                console.log("[CallMe] Background sync threw error, will retry again");
+                                attemptBackgroundRetry();
+                              }
+                            }, 15000); // Retry every 15 seconds
+                          };
+                          attemptBackgroundRetry();
+                        } else {
+                          console.log("[CallMe] Code synced to database successfully!");
+                          markInviteCodeAsSynced(user.id, code);
+                        }
                      // Update rate limit timestamp
                      setLastCodeGeneratedTime(now);
 
