@@ -53,17 +53,17 @@ export default function FriendsPage() {
    const [pendingActionId, setPendingActionId] = useState<number | null>(null);
    // Guard against state updates on unmounted component — prevents memory leaks
    // and React warnings when rapidly switching between pages
-   const isMounted = useRef(true);
-   
-    // Add Friends modal state
-    const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
-    const [inviteCodeInput, setInviteCodeInput] = useState("");
-    const [inviteCodeInputRaw, setInviteCodeInputRaw] = useState("");
-    const [redeemingCode, setRedeemingCode] = useState(false);
-    const [lastCodeGeneratedTime, setLastCodeGeneratedTime] = useState<number>(0);
-    const [sharingCode, setSharingCode] = useState(false);
-    const [isTyping, setIsTyping] = useState(false);
-    const inviteInputDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isMounted = useRef(true);
+    
+     // Add Friends modal state
+     const [showAddFriendsModal, setShowAddFriendsModal] = useState(false);
+     const [inviteCodeInput, setInviteCodeInput] = useState("");
+     const [inviteCodeInputRaw, setInviteCodeInputRaw] = useState("");
+     const [redeemingCode, setRedeemingCode] = useState(false);
+     const [lastCodeGeneratedTime, setLastCodeGeneratedTime] = useState<number>(0);
+     const [sharingCode, setSharingCode] = useState(false);
+     const [isTyping, setIsTyping] = useState(false);
+     const inviteInputDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     
 
 
@@ -864,20 +864,43 @@ export default function FriendsPage() {
                       // 3. Database is down or unreachable
                       // 4. Duplicate code (extremely unlikely, but possible)
                       
-                      // CRITICAL: Split insert and select to catch errors independently
+                      // CRITICAL: Retry mechanism with exponential backoff
                       let insertError: any = null;
                       let insertData: any = null;
+                      let retryCount = 0;
+                      const maxRetries = 2;
                       
-                      try {
-                        const insertResponse = await withTimeout(supabase
-                          .from("invite_codes")
-                          .insert(insertPayload)
-                          .select(), 10000);
-                        insertError = insertResponse.error;
-                        insertData = insertResponse.data;
-                      } catch (err) {
-                        console.error("[CallMe] insert threw error:", err);
-                        insertError = err;
+                      while (retryCount <= maxRetries && !insertData) {
+                        try {
+                          console.log(`[CallMe] Insert attempt ${retryCount + 1}/${maxRetries + 1}...`);
+                          const insertResponse = await withTimeout(supabase
+                            .from("invite_codes")
+                            .insert(insertPayload)
+                            .select(), 10000);
+                          insertError = insertResponse.error;
+                          insertData = insertResponse.data;
+                          
+                          if (insertError && retryCount < maxRetries) {
+                            // Retry after brief delay
+                            const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+                            console.log(`[CallMe] Insert failed, retrying in ${delay}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            retryCount++;
+                          } else {
+                            break;
+                          }
+                        } catch (err) {
+                          console.error(`[CallMe] insert attempt ${retryCount + 1} threw error:`, err);
+                          insertError = err;
+                          if (retryCount < maxRetries) {
+                            const delay = Math.min(1000 * Math.pow(2, retryCount), 5000);
+                            console.log(`[CallMe] Insert threw error, retrying in ${delay}ms...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            retryCount++;
+                          } else {
+                            break;
+                          }
+                        }
                       }
 
                       console.log("[CallMe] Insert response:", { insertData, insertError });
