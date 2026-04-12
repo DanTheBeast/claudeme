@@ -18,7 +18,8 @@ import AuthPage from "@/app/auth/page";
 import { soundAppLaunch } from "@/app/_lib/haptics";
 import { registerPushNotifications, clearNotificationBadge, setAppBadge } from "@/app/_lib/push-notifications";
 import { initSentry, setSentryUser, clearSentryUser } from "@/app/_lib/sentry";
-import { cacheClear } from "@/app/_lib/cache";
+import { cacheClear, withTimeout } from "@/app/_lib/cache";
+import { syncPendingInviteCodes } from "@/app/_lib/pending-code-sync";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { App as CapApp } from "@capacitor/app";
 
@@ -294,13 +295,26 @@ export default function DashboardLayout({
       }
 
       try {
-        // Refresh the session first in case the token expired while backgrounded,
-        // then re-fetch the profile so queries don't fail with auth errors.
-        // Await fetchProfile so the session is confirmed fresh before pages re-query.
-        try { await supabase.auth.refreshSession(); } catch {}
-        await fetchProfile();
-        clearNotificationBadge();
-      } finally {
+         // Refresh the session first in case the token expired while backgrounded,
+         // then re-fetch the profile so queries don't fail with auth errors.
+         // Await fetchProfile so the session is confirmed fresh before pages re-query.
+         try { await supabase.auth.refreshSession(); } catch {}
+         await fetchProfile();
+         
+         // CRITICAL: Sync any pending invite codes that failed to save earlier
+         if (user?.id) {
+           try {
+             const result = await syncPendingInviteCodes(supabase, user.id, withTimeout);
+             if (result.synced > 0) {
+               console.log(`[CallMe] Synced ${result.synced} pending invite codes`);
+             }
+           } catch (e) {
+             console.error("[CallMe] Failed to sync pending codes:", e);
+           }
+         }
+         
+         clearNotificationBadge();
+       } finally {
         // Always bump refreshKey — even if fetchProfile hit a transient error,
         // child pages should still retry their own data loads.
         setRefreshKey((k) => k + 1);
