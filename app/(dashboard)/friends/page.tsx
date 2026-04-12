@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/app/_lib/supabase-browser";
 import { cacheRead, cacheWrite, withTimeout, savePendingInviteCode, markInviteCodeAsSynced } from "@/app/_lib/cache";
+import { logInviteCodeEvent } from "@/app/_lib/invite-code-monitor";
 import { useApp } from "../layout";
 import { feedbackFriendAdded, feedbackSuccess, feedbackError, feedbackClick } from "@/app/_lib/haptics";
 import { Avatar } from "@/app/_components/avatar";
@@ -837,9 +838,10 @@ export default function FriendsPage() {
                      crypto.getRandomValues(bytes);
                      const code = Array.from(bytes).map((b) => chars[b % chars.length]).join("");
 
-                     console.log("[CallMe] Generated invite code:", code);
-                      
-                     // Validate user data before inserting
+                      console.log("[CallMe] Generated invite code:", code);
+                      logInviteCodeEvent({ code, userId: user.id, event: "generated" });
+                       
+                      // Validate user data before inserting
                      if (!user.id || !user.username) {
                        console.error("[CallMe] Missing user data:", { id: user.id, username: user.username });
                        toast("Error: Your profile is incomplete. Please update your profile and try again.");
@@ -932,6 +934,12 @@ export default function FriendsPage() {
                             timestamp: new Date().toISOString(),
                           };
                           console.error("[CallMe] Database sync error details:", errorDetails);
+                          logInviteCodeEvent({ 
+                            code, 
+                            userId: user.id, 
+                            event: "sync_failed",
+                            error: (insertError as any).message,
+                          });
                           
                           // Check if it's an RLS policy error or auth issue
                           const errorMsg = ((insertError as any).message || "").toLowerCase();
@@ -969,26 +977,28 @@ export default function FriendsPage() {
                         } else {
                           console.log("[CallMe] Code synced to database successfully!");
                           markInviteCodeAsSynced(user.id, code);
+                          logInviteCodeEvent({ code, userId: user.id, event: "sync_success" });
                         }
                      // Update rate limit timestamp
                      setLastCodeGeneratedTime(now);
 
-                     // NOW show the share dialog (code is already safe in DB)
-                     console.log("[CallMe] Showing share dialog...");
-                     try {
-                       await Share.share({
-                         title: "Join me on CallMe",
-                         text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy this entire message and paste it in the "Add Friends" section — it'll automatically extract the code:
+                      // NOW show the share dialog (code is already safe in local storage)
+                      console.log("[CallMe] Showing share dialog...");
+                      try {
+                        await Share.share({
+                          title: "Join me on CallMe",
+                          text: `I'm using CallMe to share when I'm free to call. To add me as a friend, copy this entire message and paste it in the "Add Friends" section — it'll automatically extract the code:
 
 ${code}
 
 If you don't have CallMe yet, download it here: https://apps.apple.com/app/just-call-me-app/id6759512338`,
-                       });
-                       console.log("[CallMe] Share completed successfully");
-                     } catch (shareErr) {
-                       // If share dialog fails or is cancelled, code is still in DB which is fine
-                       console.log("[CallMe] Share dialog cancelled or failed:", shareErr);
-                     }
+                        });
+                        console.log("[CallMe] Share completed successfully");
+                        logInviteCodeEvent({ code, userId: user.id, event: "shared" });
+                      } catch (shareErr) {
+                        // If share dialog fails or is cancelled, code is still safe locally
+                        console.log("[CallMe] Share dialog cancelled or failed:", shareErr);
+                      }
 
                      // Close modal since everything succeeded
                      setShowAddFriendsModal(false);
