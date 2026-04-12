@@ -870,15 +870,19 @@ export default function FriendsPage() {
                       let retryCount = 0;
                       const maxRetries = 2;
                       
-                      while (retryCount <= maxRetries && !insertData) {
-                        try {
-                          console.log(`[CallMe] Insert attempt ${retryCount + 1}/${maxRetries + 1}...`);
-                          const insertResponse = await withTimeout(supabase
-                            .from("invite_codes")
-                            .insert(insertPayload)
-                            .select(), 10000);
-                          insertError = insertResponse.error;
-                          insertData = insertResponse.data;
+                       while (retryCount <= maxRetries && !insertData) {
+                         try {
+                           const attemptTime = Date.now();
+                           console.log(`[CallMe] Insert attempt ${retryCount + 1}/${maxRetries + 1} at ${new Date(attemptTime).toISOString()}...`);
+                           const insertResponse = await withTimeout(supabase
+                             .from("invite_codes")
+                             .insert(insertPayload)
+                             .select(), 5000); // Reduced from 10s to 5s
+                           const responseTime = Date.now();
+                           console.log(`[CallMe] Insert response received after ${responseTime - attemptTime}ms`);
+                           insertError = insertResponse.error;
+                           insertData = insertResponse.data;
+                           console.log(`[CallMe] Insert result - error: ${!!insertError}, data: ${!!insertData}`);
                           
                           if (insertError && retryCount < maxRetries) {
                             // Retry after brief delay
@@ -905,35 +909,55 @@ export default function FriendsPage() {
 
                       console.log("[CallMe] Insert response:", { insertData, insertError });
                       
-                      if (insertError) {
-                        console.error("[CallMe] failed to save code - full error:", JSON.stringify(insertError, null, 2));
-                        const errorDetails = {
-                          code: (insertError as any).code,
-                          message: (insertError as any).message || insertError?.toString?.(),
-                          details: (insertError as any).details,
-                          hint: (insertError as any).hint,
-                          inviter_id: user.id,
-                          payload: insertPayload,
-                          timestamp: new Date().toISOString(),
-                        };
-                        console.error("[CallMe] code generation failed with details:", errorDetails);
-                        
-                        // Check if it's an RLS policy error or auth issue
-                        const errorMsg = ((insertError as any).message || "").toLowerCase();
-                        if ((insertError as any).code === "PGRST301" || errorMsg.includes("row-level security") || errorMsg.includes("permission")) {
-                          toast("Permission denied - signing you out. Please sign back in.");
-                          // Force sign out to refresh session
-                          await supabase.auth.signOut();
-                          return;
-                        } else if (errorMsg.includes("duplicate")) {
-                          toast("This code was already used - generate a new one");
-                        } else if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
-                          toast("Network timeout - check your connection and try again");
-                        } else {
-                          toast("Failed to save code — check your connection and try again");
-                        }
-                        return;
-                      }
+                       if (insertError) {
+                         console.error("[CallMe] failed to save code - full error:", JSON.stringify(insertError, null, 2));
+                         const errorDetails = {
+                           code: (insertError as any).code,
+                           message: (insertError as any).message || insertError?.toString?.(),
+                           details: (insertError as any).details,
+                           hint: (insertError as any).hint,
+                           inviter_id: user.id,
+                           payload: insertPayload,
+                           timestamp: new Date().toISOString(),
+                         };
+                         console.error("[CallMe] code generation failed with details:", errorDetails);
+                         
+                         // Check if it's an RLS policy error or auth issue
+                         const errorMsg = ((insertError as any).message || "").toLowerCase();
+                         if ((insertError as any).code === "PGRST301" || errorMsg.includes("row-level security") || errorMsg.includes("permission")) {
+                           toast("Permission denied - signing you out. Please sign back in.");
+                           // Force sign out to refresh session
+                           await supabase.auth.signOut();
+                           return;
+                         }
+                         
+                         // CRITICAL FALLBACK: If database save fails, still show share dialog
+                         // with a warning so the user isn't completely blocked from adding friends.
+                         // The code will retry saving in the background.
+                         console.warn("[CallMe] DATABASE INSERT FAILED - showing fallback share dialog anyway");
+                         toast("Network issue — will retry saving this code. Please share it!");
+                         
+                         // Set a flag to retry saving this code in the background
+                         const failedCode = code;
+                         const retryAttempt = () => {
+                           setTimeout(async () => {
+                             try {
+                               const retryResponse = await withTimeout(supabase
+                                 .from("invite_codes")
+                                 .insert(insertPayload)
+                                 .select(), 5000);
+                               if (!retryResponse.error) {
+                                 console.log("[CallMe] Background retry succeeded!");
+                               }
+                             } catch (e) {
+                               console.log("[CallMe] Background retry also failed");
+                             }
+                           }, 5000);
+                         };
+                         retryAttempt();
+                         
+                         // Continue to share dialog anyway (code is at least generated locally)
+                       }
 
                       console.log("[CallMe] Code saved successfully!", insertData);
                      // Update rate limit timestamp
