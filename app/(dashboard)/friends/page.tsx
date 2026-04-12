@@ -863,28 +863,42 @@ export default function FriendsPage() {
                       // 2. Network timeout (>10s) - request is abandoned mid-flight
                       // 3. Database is down or unreachable
                       // 4. Duplicate code (extremely unlikely, but possible)
-                      const { data, error } = await withTimeout(supabase
-                        .from("invite_codes")
-                        .insert(insertPayload)
-                        .select(), 10000);
+                      
+                      // CRITICAL: Split insert and select to catch errors independently
+                      let insertError: any = null;
+                      let insertData: any = null;
+                      
+                      try {
+                        const insertResponse = await withTimeout(supabase
+                          .from("invite_codes")
+                          .insert(insertPayload)
+                          .select(), 10000);
+                        insertError = insertResponse.error;
+                        insertData = insertResponse.data;
+                      } catch (err) {
+                        console.error("[CallMe] insert threw error:", err);
+                        insertError = err;
+                      }
 
-                     console.log("[CallMe] Insert response:", { data, error });
-                     console.log("[CallMe] Insert error details:", error ? { message: error.message, code: error.code, details: error.details, hint: error.hint } : null);
-                     
-                      if (error) {
-                        console.error("[CallMe] failed to save code - full error:", JSON.stringify(error, null, 2));
-                        console.error("[CallMe] code generation failed with details:", {
-                          code: error.code,
-                          message: error.message,
-                          details: (error as any).details,
-                          hint: (error as any).hint,
+                      console.log("[CallMe] Insert response:", { insertData, insertError });
+                      
+                      if (insertError) {
+                        console.error("[CallMe] failed to save code - full error:", JSON.stringify(insertError, null, 2));
+                        const errorDetails = {
+                          code: (insertError as any).code,
+                          message: (insertError as any).message || insertError?.toString?.(),
+                          details: (insertError as any).details,
+                          hint: (insertError as any).hint,
                           inviter_id: user.id,
                           payload: insertPayload,
-                        });
+                          timestamp: new Date().toISOString(),
+                        };
+                        console.error("[CallMe] code generation failed with details:", errorDetails);
+                        
                         // Check if it's an RLS policy error
-                        if (error.code === "PGRST301" || error.message?.includes("row-level security")) {
+                        if ((insertError as any).code === "PGRST301" || (insertError as any).message?.includes("row-level security")) {
                           toast("Permission denied - your session may have expired. Try signing out and back in.");
-                        } else if (error.message?.includes("duplicate")) {
+                        } else if ((insertError as any).message?.includes("duplicate")) {
                           toast("This code was already used - generate a new one");
                         } else {
                           toast("Failed to generate code — check your connection");
@@ -892,7 +906,7 @@ export default function FriendsPage() {
                         return;
                       }
 
-                     console.log("[CallMe] Code saved successfully!", data);
+                      console.log("[CallMe] Code saved successfully!", insertData);
                      // Update rate limit timestamp
                      setLastCodeGeneratedTime(now);
 
