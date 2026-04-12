@@ -881,7 +881,16 @@ export default function FriendsPage() {
                                .insert(insertPayload), 5000); // 5s timeout per attempt
                              
                              const responseTime = Date.now();
-                             console.log(`[CallMe] Response received in ${responseTime - attemptTime}ms - error: ${!!insertResponse.error}`);
+                             console.log(`[CallMe] Response received in ${responseTime - attemptTime}ms`);
+                             
+                             if (insertResponse.error) {
+                               console.error("[CallMe] Insert error:", {
+                                 code: (insertResponse.error as any).code,
+                                 message: (insertResponse.error as any).message,
+                                 details: (insertResponse.error as any).details,
+                                 hint: (insertResponse.error as any).hint,
+                               });
+                             }
                              
                              insertError = insertResponse.error;
                              // If no error, mark as success
