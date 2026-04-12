@@ -857,27 +857,40 @@ export default function FriendsPage() {
                      // CRITICAL CHANGE: Save to database FIRST (before showing share dialog)
                      // This way the code is safe in the database immediately
                      // and the app doesn't block on the Share.share() promise
-                     console.log("[CallMe] Saving code to database (before share)...");
-                     const { data, error } = await withTimeout(supabase
-                       .from("invite_codes")
-                       .insert(insertPayload)
-                       .select(), 10000);
+                      console.log("[CallMe] Saving code to database (before share)...");
+                      // IMPORTANT: This insert can fail if:
+                      // 1. User's auth session is invalid (RLS check fails)
+                      // 2. Network timeout (>10s) - request is abandoned mid-flight
+                      // 3. Database is down or unreachable
+                      // 4. Duplicate code (extremely unlikely, but possible)
+                      const { data, error } = await withTimeout(supabase
+                        .from("invite_codes")
+                        .insert(insertPayload)
+                        .select(), 10000);
 
                      console.log("[CallMe] Insert response:", { data, error });
                      console.log("[CallMe] Insert error details:", error ? { message: error.message, code: error.code, details: error.details, hint: error.hint } : null);
                      
-                     if (error) {
-                       console.error("[CallMe] failed to save code - full error:", JSON.stringify(error, null, 2));
-                       // Check if it's an RLS policy error
-                       if (error.code === "PGRST301" || error.message?.includes("row-level security")) {
-                         toast("Permission denied - your session may have expired. Try signing out and back in.");
-                       } else if (error.message?.includes("duplicate")) {
-                         toast("This code was already used - generate a new one");
-                       } else {
-                         toast("Failed to generate code — check your connection");
-                       }
-                       return;
-                     }
+                      if (error) {
+                        console.error("[CallMe] failed to save code - full error:", JSON.stringify(error, null, 2));
+                        console.error("[CallMe] code generation failed with details:", {
+                          code: error.code,
+                          message: error.message,
+                          details: (error as any).details,
+                          hint: (error as any).hint,
+                          inviter_id: user.id,
+                          payload: insertPayload,
+                        });
+                        // Check if it's an RLS policy error
+                        if (error.code === "PGRST301" || error.message?.includes("row-level security")) {
+                          toast("Permission denied - your session may have expired. Try signing out and back in.");
+                        } else if (error.message?.includes("duplicate")) {
+                          toast("This code was already used - generate a new one");
+                        } else {
+                          toast("Failed to generate code — check your connection");
+                        }
+                        return;
+                      }
 
                      console.log("[CallMe] Code saved successfully!", data);
                      // Update rate limit timestamp
