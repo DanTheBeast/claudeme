@@ -895,13 +895,19 @@ export default function FriendsPage() {
                         };
                         console.error("[CallMe] code generation failed with details:", errorDetails);
                         
-                        // Check if it's an RLS policy error
-                        if ((insertError as any).code === "PGRST301" || (insertError as any).message?.includes("row-level security")) {
-                          toast("Permission denied - your session may have expired. Try signing out and back in.");
-                        } else if ((insertError as any).message?.includes("duplicate")) {
+                        // Check if it's an RLS policy error or auth issue
+                        const errorMsg = ((insertError as any).message || "").toLowerCase();
+                        if ((insertError as any).code === "PGRST301" || errorMsg.includes("row-level security") || errorMsg.includes("permission")) {
+                          toast("Permission denied - signing you out. Please sign back in.");
+                          // Force sign out to refresh session
+                          await supabase.auth.signOut();
+                          return;
+                        } else if (errorMsg.includes("duplicate")) {
                           toast("This code was already used - generate a new one");
+                        } else if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
+                          toast("Network timeout - check your connection and try again");
                         } else {
-                          toast("Failed to generate code — check your connection");
+                          toast("Failed to save code — check your connection and try again");
                         }
                         return;
                       }
